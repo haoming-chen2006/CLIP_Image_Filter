@@ -6,8 +6,8 @@ from tqdm import tqdm
 from transformers import DistilBertTokenizer
 import matplotlib.pyplot as plt
 import pandas as pd
-
-import config as CFG
+import os
+from config import CFG
 from dataset import CLIPDataset, get_transforms
 from clip import CLIPModel
 
@@ -32,8 +32,8 @@ def get_image_embeddings(image_names, comments, model_path):
     
     # Create dataset and loader
     dataset = CLIPDataset(
-        image_names[:1000],  # Use subset for faster inference
-        comments[:1000],
+        image_names[:10000],  # Use subset for faster inference
+        comments[:10000],
         tokenizer,
         get_transforms("valid"),
     )
@@ -57,7 +57,7 @@ def get_image_embeddings(image_names, comments, model_path):
             image_embeddings = model.image_projection(image_features)
             valid_image_embeddings.append(image_embeddings)
     
-    return model, torch.cat(valid_image_embeddings), image_names[:1000]
+    return model, torch.cat(valid_image_embeddings), image_names[:10000]
 
 
 def find_matches(model, image_embeddings, query, image_filenames, n=9):
