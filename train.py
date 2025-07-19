@@ -8,16 +8,21 @@ from torch import nn
 from transformers import DistilBertTokenizer
 
 import config as CFG
-from dataset import ArtBenchDataset, get_transforms
+from dataset import ArtBenchDataset, ArtBenchImageFolderDataset, get_transforms
 from CLIP import CLIPModel
 from utils import AvgMeter, get_lr
 
 
 def build_loaders(tokenizer):
-    train_dataset = ArtBenchDataset(
+    dataset_cls = (
+        ArtBenchImageFolderDataset
+        if CFG.dataset_type == "folder"
+        else ArtBenchDataset
+    )
+    train_dataset = dataset_cls(
         CFG.dataset_root, tokenizer, get_transforms("train"), train=True
     )
-    valid_dataset = ArtBenchDataset(
+    valid_dataset = dataset_cls(
         CFG.dataset_root, tokenizer, get_transforms("valid"), train=False
     )
 

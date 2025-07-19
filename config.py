@@ -1,9 +1,14 @@
+import torch
+
+
 class CFG:
     debug = False
     image_path = "Moein/AI/Datasets/Flicker-8k/Images"  # unused for ArtBench
     captions_path = "Moein/AI/Datasets/Flicker-8k"      # unused for ArtBench
-    # location of ArtBench10 pickled batches
-    dataset_root = "artbench-10-python/artbench-10-batches-py"
+    # location of ArtBench10 dataset
+    # for the 256x256 version download it from Kaggle and set this path
+    dataset_root = "artbench-10-256"
+    dataset_type = "folder"  # 'binary' for 32x32 pickled batches, 'folder' for image folders
     batch_size = 32
     num_workers = 4
     head_lr = 1e-3
