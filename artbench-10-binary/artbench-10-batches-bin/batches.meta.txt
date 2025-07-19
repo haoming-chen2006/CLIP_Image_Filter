@@ -1,0 +1,10 @@
+impressionism
+realism
+romanticism
+expressionism
+baroque
+post_impressionism
+art_nouveau
+surrealism
+ukiyo_e
+renaissance
