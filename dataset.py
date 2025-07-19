@@ -89,6 +89,46 @@ class ArtBenchDataset(torch.utils.data.Dataset):
         return item
 
 
+class ArtBenchImageFolderDataset(torch.utils.data.Dataset):
+    """Dataset loader for ArtBench10 image folders (e.g. 256x256 version)."""
+
+    def __init__(self, root, tokenizer, transforms, train=True):
+        self.transforms = transforms
+        self.tokenizer = tokenizer
+
+        split = "train" if train else "test"
+        split_root = os.path.join(root, split)
+        self.image_paths = []
+        self.captions = []
+
+        if os.path.isdir(split_root):
+            for style in sorted(os.listdir(split_root)):
+                style_dir = os.path.join(split_root, style)
+                if not os.path.isdir(style_dir):
+                    continue
+                for fname in os.listdir(style_dir):
+                    if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                        self.image_paths.append(os.path.join(style_dir, fname))
+                        self.captions.append(style)
+        self.encoded_captions = tokenizer(
+            self.captions, padding=True, truncation=True, max_length=CFG.max_length
+        )
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        item = {
+            key: torch.tensor(val[idx]) for key, val in self.encoded_captions.items()
+        }
+        image = cv2.imread(self.image_paths[idx])
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = self.transforms(image=image)["image"]
+        item["image"] = torch.tensor(image).permute(2, 0, 1).float()
+        item["caption"] = self.captions[idx]
+        return item
+
+
 
 def get_transforms(mode="train"):
     if mode == "train":
