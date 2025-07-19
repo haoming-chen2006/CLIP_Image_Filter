@@ -1,28 +1,45 @@
 import os
-import pickle
-
+import pandas as pd
 import albumentations as A
 import cv2
 import numpy as np
 import torch
+from transformers import DistilBertTokenizer
+import matplotlib.pyplot as plt
+from PIL import Image
 
-import config as CFG
+from config import CFG
 
+
+
+
+print(CFG)
 
 class CLIPDataset(torch.utils.data.Dataset):
-    def __init__(self, image_filenames, captions, tokenizer, transforms, image_root=None):
+    def __init__(self, image_filenames, captions, tokenizer, transforms):
         """
-        image_filenames and cpations must have the same length; so, if there are
-        multiple captions for each image, the image_filenames must have repetitive
-        file names 
+        Simple CLIP dataset
+        image_filenames and captions must have the same length
         """
-
         self.image_filenames = image_filenames
         self.captions = list(captions)
-        self.image_root = image_root if image_root is not None else CFG.image_path
-        self.encoded_captions = tokenizer(
-            list(captions), padding=True, truncation=True, max_length=CFG.max_length
-        )
+        
+        # Clean captions - ensure all are strings and not None/NaN
+        clean_captions = []
+        for caption in self.captions:
+            if caption is None or str(caption).lower() == 'nan':
+                clean_captions.append("No caption available")
+            else:
+                clean_captions.append(str(caption))
+        
+        self.captions = clean_captions
+        
+        if tokenizer is not None:
+            self.encoded_captions = tokenizer(
+                self.captions, padding=True, truncation=True, max_length=CFG.max_length
+            )
+        else:
+            self.encoded_captions = self.captions        
         self.transforms = transforms
 
     def __getitem__(self, idx):
@@ -31,161 +48,127 @@ class CLIPDataset(torch.utils.data.Dataset):
             for key, values in self.encoded_captions.items()
         }
 
-        image_path = self.image_filenames[idx]
-        if self.image_root is not None and not os.path.isabs(image_path):
-            image_path = os.path.join(self.image_root, image_path)
+        # Build full image path
+        image_path = os.path.join(CFG.image_path, self.image_filenames[idx])
+        
+        # Load and process image
         image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        if image is None:
+            # Create placeholder if image not found
+            print(f"Warning: Image {image_path} not found, using placeholder.")
+            image = np.zeros((CFG.size, CFG.size, 3), dtype=np.uint8)
+        else:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
         image = self.transforms(image=image)['image']
         item['image'] = torch.tensor(image).permute(2, 0, 1).float()
         item['caption'] = self.captions[idx]
 
         return item
 
-
     def __len__(self):
         return len(self.captions)
 
 
-class ArtBenchDataset(torch.utils.data.Dataset):
-    """Dataset loader for ArtBench10 pickled batches."""
-
-    def __init__(self, root, tokenizer, transforms, train=True):
-        self.transforms = transforms
-        self.tokenizer = tokenizer
-
-        with open(os.path.join(root, "meta"), "rb") as f:
-            meta = pickle.load(f, encoding="latin1")
-        self.styles = meta["styles"]
-
-        self.images = []
-        self.labels = []
-
-        if train:
-            batch_files = [f"data_batch_{i}" for i in range(1, 6)]
-        else:
-            batch_files = ["test_batch"]
-
-        for bf in batch_files:
-            with open(os.path.join(root, bf), "rb") as f:
-                batch = pickle.load(f, encoding="latin1")
-            self.images.append(batch["data"])
-            self.labels.extend(batch["labels"])
-
-        self.images = np.concatenate(self.images, axis=0).reshape(-1, 3, 32, 32)
-        self.captions = [self.styles[idx] for idx in self.labels]
-
-        self.encoded_captions = tokenizer(
-            self.captions, padding=True, truncation=True, max_length=CFG.max_length
-        )
-
-    def __len__(self):
-        return len(self.captions)
-
-    def __getitem__(self, idx):
-        item = {
-            key: torch.tensor(val[idx]) for key, val in self.encoded_captions.items()
-        }
-        image = self.images[idx].transpose(1, 2, 0)
-        image = self.transforms(image=image)["image"]
-        item["image"] = torch.tensor(image).permute(2, 0, 1).float()
-        item["caption"] = self.captions[idx]
-        return item
-
-
-class ArtBenchImageFolderDataset(torch.utils.data.Dataset):
-    """Dataset loader for ArtBench10 image folders (e.g. 256x256 version)."""
-
-    def __init__(self, root, tokenizer, transforms, train=True):
-        self.transforms = transforms
-        self.tokenizer = tokenizer
-
-        split = "train" if train else "test"
-        split_root = os.path.join(root, split)
-        self.image_paths = []
-        self.captions = []
-
-        if os.path.isdir(split_root):
-            for style in sorted(os.listdir(split_root)):
-                style_dir = os.path.join(split_root, style)
-                if not os.path.isdir(style_dir):
-                    continue
-                for fname in os.listdir(style_dir):
-                    if fname.lower().endswith((".jpg", ".jpeg", ".png")):
-                        self.image_paths.append(os.path.join(style_dir, fname))
-                        self.captions.append(style)
-        self.encoded_captions = tokenizer(
-            self.captions, padding=True, truncation=True, max_length=CFG.max_length
-        )
-
-    def __len__(self):
-        return len(self.image_paths)
-
-    def __getitem__(self, idx):
-        item = {
-            key: torch.tensor(val[idx]) for key, val in self.encoded_captions.items()
-        }
-        image = cv2.imread(self.image_paths[idx])
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = self.transforms(image=image)["image"]
-        item["image"] = torch.tensor(image).permute(2, 0, 1).float()
-        item["caption"] = self.captions[idx]
-        return item
-
+def load_flickr_data():
+    """
+    Load Flickr data from results.csv
+    Returns: image_names (list), captions (list)
+    """
+    csv_path = "/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images/results.csv"
+    
+    # Load CSV with pipe separator
+    df = pd.read_csv(csv_path, sep='|')
+    
+    # Extract columns and remove any rows with missing data
+    df = df.dropna(subset=['image_name', ' comment'])
+    
+    image_names = df['image_name'].tolist()
+    captions = df[' comment'].tolist()  # Note: space before 'comment'
+    
+    # Additional cleaning - ensure all captions are strings
+    clean_image_names = []
+    clean_captions = []
+    
+    for img, cap in zip(image_names, captions):
+        if img and cap and str(cap).strip() and str(cap).lower() != 'nan':
+            clean_image_names.append(str(img))
+            clean_captions.append(str(cap).strip())
+    
+    print(f"Loaded {len(clean_image_names)} valid image-caption pairs")
+    return clean_image_names, clean_captions
 
 
 def get_transforms(mode="train"):
-    if mode == "train":
-        return A.Compose(
-            [
-                A.Resize(CFG.size, CFG.size, always_apply=True),
-                A.Normalize(max_pixel_value=255.0, always_apply=True),
-            ]
-        )
-    else:
-        return A.Compose(
-            [
-                A.Resize(CFG.size, CFG.size, always_apply=True),
-                A.Normalize(max_pixel_value=255.0, always_apply=True),
-            ]
-        )
+    """Get image transforms"""
+    return A.Compose([
+        A.Resize(256, 256),
+        A.Normalize(max_pixel_value=255.0),
+    ])
+
+def visualize_first_five():
+    """Visualize first 5 images and captions from the dataset"""
+    
+    # Load data
+    images, captions = load_flickr_data()
+    
+    # Create tokenizer
+    tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+    
+    # Show first 5 filenames and captions
+    print("First 5 image filenames and captions:")
+    print("=" * 60)
+    for i in range(5):
+        print(f"{i+1}. Image: {images[i]}")
+        print(f"   Caption: {captions[i]}")
+        print()
+    
+    # Create visualization
+    fig, axes = plt.subplots(1, 5, figsize=(20, 4))
+    
+    for i in range(5):
+        # Build image path
+        img_path = os.path.join(CFG.image_path, images[i])
+        
+        try:
+            # Load image
+            if os.path.exists(img_path):
+                img = Image.open(img_path)
+                axes[i].imshow(img)
+                
+                # Truncate caption for title
+                caption = captions[i]
+                if len(caption) > 40:
+                    caption = caption[:37] + "..."
+                axes[i].set_title(caption, fontsize=8, wrap=True)
+                print(f"✓ Loaded: {images[i]}")
+            else:
+                axes[i].text(0.5, 0.5, f"Not found:\n{images[i]}", ha='center', va='center')
+                axes[i].set_title("Image not found", fontsize=8)
+                print(f"✗ Not found: {img_path}")
+                
+        except Exception as e:
+            axes[i].text(0.5, 0.5, f"Error:\n{str(e)}", ha='center', va='center')
+            axes[i].set_title("Error", fontsize=8)
+            print(f"✗ Error loading {images[i]}: {e}")
+        
+        axes[i].axis('off')
+    
+    plt.tight_layout()
+    plt.suptitle("First 5 Images from Flickr Dataset", fontsize=14, y=1.02)
+    
+    # Save the plot
+    plt.savefig('first_five_images.png', dpi=150, bbox_inches='tight')
+    print("\n✓ Saved visualization to 'first_five_images.png'")
+    
+    # Try to show (might not work in server environment)
+    try:
+        plt.show()
+    except:
+        print("Display not available, image saved to file instead")
 
 
-def _parse_flickr_tokens(token_file):
-    captions = {}
-    with open(token_file, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            name_cap, caption = line.split("\t")
-            image = name_cap.split("#")[0]
-            captions.setdefault(image, []).append(caption)
-    return captions
-
-
-def load_flickr8k(root, split="train"):
-    """Return lists of image filenames and captions for a given split."""
-    text_dir = root
-    token_path = os.path.join(text_dir, "Flickr8k.token.txt")
-    if not os.path.exists(token_path):
-        token_path = os.path.join(text_dir, "captions.txt")
-    captions = _parse_flickr_tokens(token_path)
-
-    split_files = {
-        "train": os.path.join(text_dir, "Flickr_8k.trainImages.txt"),
-        "val": os.path.join(text_dir, "Flickr_8k.devImages.txt"),
-        "test": os.path.join(text_dir, "Flickr_8k.testImages.txt"),
-    }
-    with open(split_files[split], "r") as f:
-        images = [l.strip() for l in f if l.strip()]
-
-    image_filenames = []
-    caption_list = []
-    for img in images:
-        for cap in captions.get(img, []):
-            image_filenames.append(img)
-            caption_list.append(cap)
-
-    image_root = os.path.join(root, "Images")
-    return image_root, image_filenames, caption_list
+# Update the test code at the bottom
+if __name__ == "__main__":
+    # Test the visualization
+    visualize_first_five()

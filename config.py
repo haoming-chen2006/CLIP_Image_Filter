@@ -4,8 +4,8 @@ import torch
 
 class CFG:
     debug = False
-    dataset_root = "Moein/AI/Datasets/Flicker-8k"
-    image_path = os.path.join(dataset_root, "Images")
+    dataset_root = "/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images"
+    image_path = '/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images/flickr30k_images'
     captions_path = dataset_root
     batch_size = 32
     num_workers = 4
@@ -30,7 +30,7 @@ class CFG:
     temperature = 1.0
 
     # image size
-    size = 224
+    size = 256
 
     # for projection head; used for both image and text encoders
     num_projection_layers = 1

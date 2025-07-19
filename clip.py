@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-import config as CFG
+from config import CFG
 from modules import ImageEncoder, TextEncoder, ProjectionHead
 
 
