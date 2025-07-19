@@ -84,14 +84,20 @@ def main():
 
     model = CLIPModel().to(CFG.device)
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=CFG.lr, weight_decay=CFG.weight_decay
+        [
+            {"params": model.image_encoder.parameters(), "lr": CFG.image_encoder_lr},
+            {"params": model.text_encoder.parameters(), "lr": CFG.text_encoder_lr},
+            {"params": list(model.image_projection.parameters()) + list(model.text_projection.parameters()), "lr": CFG.head_lr},
+        ],
+        weight_decay=CFG.weight_decay,
     )
     lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", patience=CFG.patience, factor=CFG.factor
     )
     step = "epoch"
 
-    best_loss = float('inf')
+    os.makedirs("checkpoints", exist_ok=True)
+    best_loss = float("inf")
     for epoch in range(CFG.epochs):
         print(f"Epoch: {epoch + 1}")
         model.train()
@@ -99,7 +105,16 @@ def main():
         model.eval()
         with torch.no_grad():
             valid_loss = valid_epoch(model, valid_loader)
-        
+
+        torch.save(
+            {
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "epoch": epoch + 1,
+            },
+            f"checkpoints/epoch_{epoch + 1}.pt",
+        )
+
         if valid_loss.avg < best_loss:
             best_loss = valid_loss.avg
             torch.save(model.state_dict(), "best.pt")

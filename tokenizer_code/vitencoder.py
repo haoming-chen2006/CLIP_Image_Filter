@@ -85,8 +85,18 @@ class AttentionBlock(nn.Module):
         return x
 
 class VisionTransformer(nn.Module):
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768,
-                 depth=12, n_heads=12, dropout=0.1, num_classes=1000,proj_dim = 512)):
+    def __init__(
+        self,
+        img_size=224,
+        patch_size=16,
+        in_chans=3,
+        embed_dim=768,
+        depth=12,
+        n_heads=12,
+        dropout=0.1,
+        num_classes=1000,
+        proj_dim=512,
+    ):
         super().__init__()
         self.patch_embed = PatchEmbed(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
