@@ -1,29 +1,57 @@
 import os
-import gc
-import numpy as np
+import random
 from tqdm import tqdm
 
 import torch
 from torch import nn
 from transformers import DistilBertTokenizer
+from PIL import Image
+import matplotlib.pyplot as plt
 
 import config as CFG
-from dataset import ArtBenchDataset, ArtBenchImageFolderDataset, get_transforms
+from dataset import CLIPDataset, get_transforms, load_flickr8k
 from CLIP import CLIPModel
 from utils import AvgMeter, get_lr
 
 
+def show_samples(image_root, image_files, captions, num=6):
+    """Visualize a few image-caption pairs."""
+    idxs = random.sample(range(len(captions)), min(num, len(captions)))
+    cols = 3
+    rows = (num + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 4, rows * 4))
+    axes = axes.flatten()
+    for ax, i in zip(axes, idxs):
+        path = image_files[i]
+        if not os.path.isabs(path):
+            path = os.path.join(image_root, path)
+        image = Image.open(path)
+        ax.imshow(image)
+        ax.set_title(captions[i], fontsize=8)
+        ax.axis("off")
+    for ax in axes[len(idxs):]:
+        ax.axis("off")
+    plt.tight_layout()
+    plt.show()
+
+
 def build_loaders(tokenizer):
-    dataset_cls = (
-        ArtBenchImageFolderDataset
-        if CFG.dataset_type == "folder"
-        else ArtBenchDataset
+    image_root, train_images, train_captions = load_flickr8k(CFG.captions_path, "train")
+    _, val_images, val_captions = load_flickr8k(CFG.captions_path, "val")
+
+    train_dataset = CLIPDataset(
+        train_images,
+        train_captions,
+        tokenizer,
+        get_transforms("train"),
+        image_root=image_root,
     )
-    train_dataset = dataset_cls(
-        CFG.dataset_root, tokenizer, get_transforms("train"), train=True
-    )
-    valid_dataset = dataset_cls(
-        CFG.dataset_root, tokenizer, get_transforms("valid"), train=False
+    valid_dataset = CLIPDataset(
+        val_images,
+        val_captions,
+        tokenizer,
+        get_transforms("valid"),
+        image_root=image_root,
     )
 
     train_loader = torch.utils.data.DataLoader(
@@ -80,6 +108,10 @@ def valid_epoch(model, valid_loader):
 def main():
     tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
     train_loader, valid_loader = build_loaders(tokenizer)
+
+    # visualize a few training samples
+    img_root, sample_imgs, sample_caps = load_flickr8k(CFG.captions_path, "train")
+    show_samples(img_root, sample_imgs, sample_caps)
 
 
     model = CLIPModel().to(CFG.device)
