@@ -1,7 +1,6 @@
 import os
 import gc
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 
 import torch
@@ -9,40 +8,34 @@ from torch import nn
 from transformers import DistilBertTokenizer
 
 import config as CFG
-from dataset import CLIPDataset, get_transforms
+from dataset import ArtBenchDataset, get_transforms
 from CLIP import CLIPModel
 from utils import AvgMeter, get_lr
 
 
-def make_train_valid_dfs():
-    dataframe = pd.read_csv(f"{CFG.captions_path}/captions.csv")
-    max_id = dataframe["id"].max() + 1 if not CFG.debug else 100
-    image_ids = np.arange(0, max_id)
-    np.random.seed(42)
-    valid_ids = np.random.choice(
-        image_ids, size=int(0.2 * len(image_ids)), replace=False
+def build_loaders(tokenizer):
+    train_dataset = ArtBenchDataset(
+        CFG.dataset_root, tokenizer, get_transforms("train"), train=True
     )
-    train_ids = [id_ for id_ in image_ids if id_ not in valid_ids]
-    train_dataframe = dataframe[dataframe["id"].isin(train_ids)].reset_index(drop=True)
-    valid_dataframe = dataframe[dataframe["id"].isin(valid_ids)].reset_index(drop=True)
-    return train_dataframe, valid_dataframe
-
-
-def build_loaders(dataframe, tokenizer, mode):
-    transforms = get_transforms(mode=mode)
-    dataset = CLIPDataset(
-        dataframe["image"].values,
-        dataframe["caption"].values,
-        tokenizer=tokenizer,
-        transforms=transforms,
+    valid_dataset = ArtBenchDataset(
+        CFG.dataset_root, tokenizer, get_transforms("valid"), train=False
     )
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
+
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
         batch_size=CFG.batch_size,
         num_workers=CFG.num_workers,
-        shuffle=True if mode == "train" else False,
+        shuffle=True,
     )
-    return dataloader
+
+    valid_loader = torch.utils.data.DataLoader(
+        valid_dataset,
+        batch_size=CFG.batch_size,
+        num_workers=CFG.num_workers,
+        shuffle=False,
+    )
+
+    return train_loader, valid_loader
 
 
 def train_epoch(model, train_loader, optimizer, lr_scheduler, step):
@@ -80,10 +73,8 @@ def valid_epoch(model, valid_loader):
 
 
 def main():
-    train_df, valid_df = make_train_valid_dfs()
     tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
-    train_loader = build_loaders(train_df, tokenizer, mode="train")
-    valid_loader = build_loaders(valid_df, tokenizer, mode="valid")
+    train_loader, valid_loader = build_loaders(tokenizer)
 
 
     model = CLIPModel().to(CFG.device)
