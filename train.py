@@ -9,6 +9,33 @@ from config import CFG
 from dataset import CLIPDataset, get_transforms, load_flickr_data
 from clip import CLIPModel
 from utils import AvgMeter, get_lr
+from inference import load_flickr_data as inf_load_data, get_image_embeddings, find_matches
+
+
+def save_checkpoint(model, optimizer, epoch, best_loss, folder="checkpoints"):
+    os.makedirs(folder, exist_ok=True)
+    checkpoint = {
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "epoch": epoch,
+        "best_loss": best_loss,
+    }
+    torch.save(checkpoint, os.path.join(folder, f"checkpoint_{epoch}.pt"))
+
+
+def load_latest_checkpoint(model, optimizer, folder="checkpoints"):
+    if not os.path.isdir(folder):
+        return 0, float("inf")
+    checkpoints = [f for f in os.listdir(folder) if f.startswith("checkpoint_") and f.endswith(".pt")]
+    if not checkpoints:
+        return 0, float("inf")
+    checkpoints.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
+    ckpt_path = os.path.join(folder, checkpoints[-1])
+    ckpt = torch.load(ckpt_path, map_location=CFG.device)
+    model.load_state_dict(ckpt["model"])
+    optimizer.load_state_dict(ckpt["optimizer"])
+    print(f"✓ Loaded checkpoint '{ckpt_path}'")
+    return ckpt.get("epoch", 0), ckpt.get("best_loss", float("inf"))
 
 
 def split_data(image_names, captions, train_ratio=0.8, val_ratio=0.1):
@@ -103,7 +130,7 @@ def main():
     optimizer = torch.optim.AdamW([
         {"params": model.image_encoder.parameters(), "lr": CFG.image_encoder_lr},
         {"params": model.text_encoder.parameters(), "lr": CFG.text_encoder_lr},
-        {"params": list(model.image_projection.parameters()) + list(model.text_projection.parameters()), 
+        {"params": list(model.image_projection.parameters()) + list(model.text_projection.parameters()),
          "lr": CFG.head_lr},
     ], weight_decay=CFG.weight_decay)
     
@@ -111,9 +138,10 @@ def main():
         optimizer, mode="min", patience=CFG.patience, factor=CFG.factor
     )
 
+    start_epoch, best_loss = load_latest_checkpoint(model, optimizer)
+
     # Training loop
-    best_loss = float("inf")
-    for epoch in range(CFG.epochs):
+    for epoch in range(start_epoch, CFG.epochs):
         print(f"\nEpoch: {epoch + 1}/{CFG.epochs}")
         
         model.train()
@@ -127,10 +155,25 @@ def main():
             best_loss = valid_loss.avg
             torch.save(model.state_dict(), "best.pt")
             print("✓ Saved Best Model!")
+
+        save_checkpoint(model, optimizer, epoch + 1, best_loss)
         
         print(f"Train Loss: {train_loss.avg:.4f} | Val Loss: {valid_loss.avg:.4f}")
 
     print("\n✓ Training completed!")
+
+    # Run inference on a sample query
+    try:
+        print("Running inference on sample query 'friendship and flowers'...")
+        img_names, captions = inf_load_data()
+        if img_names is not None:
+            model.eval()
+            model_path = "best.pt"
+            torch.save(model.state_dict(), model_path)  # ensure best weights saved
+            model, image_embeddings, subset_filenames = get_image_embeddings(img_names, captions, model_path)
+            find_matches(model, image_embeddings, "friendship and flowers", subset_filenames, n=9)
+    except Exception as e:
+        print(f"Inference failed: {e}")
 
 
 if __name__ == "__main__":
