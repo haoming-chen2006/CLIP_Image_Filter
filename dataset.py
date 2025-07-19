@@ -10,7 +10,7 @@ import config as CFG
 
 
 class CLIPDataset(torch.utils.data.Dataset):
-    def __init__(self, image_filenames, captions, tokenizer, transforms):
+    def __init__(self, image_filenames, captions, tokenizer, transforms, image_root=None):
         """
         image_filenames and cpations must have the same length; so, if there are
         multiple captions for each image, the image_filenames must have repetitive
@@ -19,6 +19,7 @@ class CLIPDataset(torch.utils.data.Dataset):
 
         self.image_filenames = image_filenames
         self.captions = list(captions)
+        self.image_root = image_root if image_root is not None else CFG.image_path
         self.encoded_captions = tokenizer(
             list(captions), padding=True, truncation=True, max_length=CFG.max_length
         )
@@ -30,7 +31,10 @@ class CLIPDataset(torch.utils.data.Dataset):
             for key, values in self.encoded_captions.items()
         }
 
-        image = cv2.imread(f"{CFG.image_path}/{self.image_filenames[idx]}")
+        image_path = self.image_filenames[idx]
+        if self.image_root is not None and not os.path.isabs(image_path):
+            image_path = os.path.join(self.image_root, image_path)
+        image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image = self.transforms(image=image)['image']
         item['image'] = torch.tensor(image).permute(2, 0, 1).float()
@@ -145,3 +149,43 @@ def get_transforms(mode="train"):
                 A.Normalize(max_pixel_value=255.0, always_apply=True),
             ]
         )
+
+
+def _parse_flickr_tokens(token_file):
+    captions = {}
+    with open(token_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            name_cap, caption = line.split("\t")
+            image = name_cap.split("#")[0]
+            captions.setdefault(image, []).append(caption)
+    return captions
+
+
+def load_flickr8k(root, split="train"):
+    """Return lists of image filenames and captions for a given split."""
+    text_dir = root
+    token_path = os.path.join(text_dir, "Flickr8k.token.txt")
+    if not os.path.exists(token_path):
+        token_path = os.path.join(text_dir, "captions.txt")
+    captions = _parse_flickr_tokens(token_path)
+
+    split_files = {
+        "train": os.path.join(text_dir, "Flickr_8k.trainImages.txt"),
+        "val": os.path.join(text_dir, "Flickr_8k.devImages.txt"),
+        "test": os.path.join(text_dir, "Flickr_8k.testImages.txt"),
+    }
+    with open(split_files[split], "r") as f:
+        images = [l.strip() for l in f if l.strip()]
+
+    image_filenames = []
+    caption_list = []
+    for img in images:
+        for cap in captions.get(img, []):
+            image_filenames.append(img)
+            caption_list.append(cap)
+
+    image_root = os.path.join(root, "Images")
+    return image_root, image_filenames, caption_list
