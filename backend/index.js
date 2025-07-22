@@ -3,7 +3,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 let vectorStore = null;
 
 function loadVectorStore() {
