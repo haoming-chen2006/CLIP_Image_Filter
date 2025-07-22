@@ -67,30 +67,32 @@ def get_image_embeddings(image_names, comments, model_path):
     return model, torch.cat(valid_image_embeddings), image_names[:10000]
 
 
-def find_matches(model, image_embeddings, query, image_filenames, n=9):
-    """Find images matching a text query"""
+def rank_images(model, image_embeddings, query, image_filenames, n=9):
+    """Rank images for a text query and return the top filenames."""
     tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
     encoded_query = tokenizer([query], padding=True, truncation=True, max_length=CFG.max_length, return_tensors="pt")
-    
+
     batch = {key: values.to(CFG.device) for key, values in encoded_query.items()}
-    
+
     with torch.no_grad():
         text_features = model.text_encoder(
-            input_ids=batch["input_ids"], 
+            input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"]
         )
         text_embeddings = model.text_projection(text_features)
-    
-    # Normalize embeddings
+
     image_embeddings_n = F.normalize(image_embeddings, p=2, dim=-1)
     text_embeddings_n = F.normalize(text_embeddings, p=2, dim=-1)
-    
-    # Compute similarity
+
     dot_similarity = text_embeddings_n @ image_embeddings_n.T
-    
-    # Get top matches
     _, indices = torch.topk(dot_similarity.squeeze(0), n)
     matches = [image_filenames[idx] for idx in indices]
+    return matches
+
+
+def find_matches(model, image_embeddings, query, image_filenames, n=9):
+    """Find images matching a text query and visualize results."""
+    matches = rank_images(model, image_embeddings, query, image_filenames, n=n)
     
     # Visualize results
     rows = 3
@@ -177,4 +179,19 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse, json
+
+    parser = argparse.ArgumentParser(description="CLIP inference")
+    parser.add_argument("--query", type=str, help="run a single search query")
+    parser.add_argument("--top", type=int, default=1, help="number of results to return")
+    args = parser.parse_args()
+
+    if args.query:
+        image_names, comments = load_flickr_data()
+        CFG.image_path = "my-app/public/images"
+        model_path = "best.pt"
+        model, image_embeddings, subset_filenames = get_image_embeddings(image_names, comments, model_path)
+        matches = rank_images(model, image_embeddings, args.query, subset_filenames, n=args.top)
+        print(json.dumps({"matches": matches}))
+    else:
+        main()
