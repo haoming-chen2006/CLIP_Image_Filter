@@ -36,3 +36,30 @@ After it is running you only need to start the Next.js frontend.
    `http://localhost:3000/images` in your browser. Submitting text in the search
    bar will call `/api/search` which proxies to the backend to retrieve the best
    matching image.
+
+## Running on HPC (e.g. NERSC Perlmutter)
+
+When using an interactive compute node you will typically want to forward ports
+so that the frontend and backend are reachable from your local machine.  One
+approach is to open an SSH tunnel before launching the demo:
+
+```bash
+ssh -L 3000:localhost:3000 -L 8000:localhost:8000 <user>@perlmutter.nersc.gov
+```
+
+After connecting, generate the vector store and start the services as usual:
+
+```bash
+python3 vector_store.py        # only needed once
+BACKEND_URL=http://localhost:8000 ./scripts/start.sh
+```
+
+You can then browse to `http://localhost:3000/images` on your local machine.
+If you encounter connection errors, verify that both ports are listening using:
+
+```bash
+python3 scripts/check_ports.py
+```
+
+The script will report whether the backend and frontend are reachable on the
+expected ports.
