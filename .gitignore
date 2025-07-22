@@ -45,7 +45,6 @@ Thumbs.db
 logs/
 
 # Generated images and plots
-*.png
 *.jpg
 *.jpeg
 search_results_*.png
