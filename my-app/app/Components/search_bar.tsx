@@ -3,7 +3,11 @@
 import React, { useState, useEffect } from 'react'
 import styles from '../styles.module.css';
 
-const SearchBar = () => {
+interface SearchBarProps {
+  onSearch?: (query: string) => void;
+}
+
+const SearchBar: React.FC<SearchBarProps> = ({ onSearch }) => {
     const [info, setInfo] = useState(
         {
             "subject": '',
@@ -15,9 +19,9 @@ const SearchBar = () => {
 
     // Define form fields configuration
     const formFields = [
-        { key: 'subject', label: 'Subject', placeholder: 'Enter subject' },
-        { key: 'color', label: 'Color', placeholder: 'Enter color' },
-        { key: 'other', label: 'Other', placeholder: 'Enter other info' }
+        { key: 'subject', label: 'Subject', placeholder: 'Enter subject (e.g., dog, cat, person)' },
+        { key: 'color', label: 'Color', placeholder: 'Enter color (e.g., red, blue, green)' },
+        { key: 'other', label: 'Other', placeholder: 'Enter other info (e.g., running, sitting)' }
     ];
 
     // Real-time monitoring of info changes
@@ -37,7 +41,15 @@ const SearchBar = () => {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setdisplay(true);
-        // You can add your submission logic here
+        
+        // Create search query from form inputs
+        const searchQuery = [info.subject, info.color, info.other]
+            .filter(item => item.trim() !== '')
+            .join(' ');
+            
+        if (searchQuery.trim() && onSearch) {
+            onSearch(searchQuery);
+        }
     }
 
     const displayCard = () => {
