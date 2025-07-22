@@ -12,18 +12,25 @@ from dataset import CLIPDataset, get_transforms
 from clip import CLIPModel
 
 
-def load_flickr_data():
-    """Load Flickr data for inference"""
-    file_path = "/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images/results.csv"
-    
+def load_image_list(csv_path: str):
+    """Load image filenames from a CSV list"""
+    paths = []
     try:
-        df = pd.read_csv(file_path, sep='|')
-        image_names = df['image_name'].dropna().tolist()
-        comments = df[' comment'].dropna().tolist()
-        return image_names, comments
+        with open(csv_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    paths.append(os.path.basename(line))
     except Exception as e:
-        print(f"Error loading data: {e}")
-        return None, None
+        print(f"Error reading {csv_path}: {e}")
+    return paths
+
+
+def load_flickr_data(csv_path: str = "my-app/public/image_paths.csv"):
+    """Load image names from a simple CSV file"""
+    image_names = load_image_list(csv_path)
+    comments = ["" for _ in image_names]
+    return image_names, comments
 
 
 def get_image_embeddings(image_names, comments, model_path):
@@ -128,9 +135,10 @@ def main():
     """Main inference function"""
     print("CLIP Inference - Text-to-Image Search")
     print("=" * 50)
-    
+
     # Load data
     image_names, comments = load_flickr_data()
+    CFG.image_path = "my-app/public/images"
     if image_names is None:
         print("Failed to load data")
         return
