@@ -12,7 +12,7 @@ const Navbar = () => {
     const links = [
         {name: "home", url:"/"},
         {name: "images", url: "/images"},
-        {name: "users", url: "/users"},
+        {name: "queries", url: "/queries"},
         {name: "configs", url: "/configs"},
     ]
   return (

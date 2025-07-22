@@ -21,30 +21,18 @@ After it is running you only need to start the Next.js frontend.
    computes embeddings using the model from `best.pt` and stores them
    for later use.
 
-2. **Start the inference backend**
+2. **Start both backend and frontend**
+
+   Once the vector store is available you can launch the entire demo with a
+   single command:
 
    ```bash
-   node backend/index.js
+   ./scripts/start.sh
    ```
 
-   The server listens on `PORT` (default `8000`).
-
-   The server loads the vector store on start and exposes two endpoints:
-
-   - `GET /init` – loads embeddings if not yet loaded
-   - `GET /search?q=<text>` – returns the filename of the best matching image
-
-3. **Run the Next.js frontend**
-
-   Set `BACKEND_URL` to the address of the inference server if it is not running
-   on the same machine:
-
-   ```bash
-   export BACKEND_URL=http://<backend-host>:8000
-   cd my-app
-   npm run dev
-   ```
-
-   Visiting `http://localhost:3000/images` will trigger `/api/init` to load the
-   embeddings. Submitting text in the search bar calls `/api/search` which
-   proxies to the backend using `BACKEND_URL` to obtain the best matching image.
+   The script starts the Node.js inference server on port `8000` and then runs
+   the Next.js frontend (available on `http://localhost:3000`). `BACKEND_URL` is
+   automatically set to the local backend, so you can simply visit
+   `http://localhost:3000/images` in your browser. Submitting text in the search
+   bar will call `/api/search` which proxies to the backend to retrieve the best
+   matching image.
