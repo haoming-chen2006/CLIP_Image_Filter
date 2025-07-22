@@ -45,30 +45,25 @@ const ImagesPage = () => {
     '00000359.JPG', '00000368.JPG', '00000370.JPG', '00000374.JPG', '00000375.JPG',
     '00000382.JPG', '00000383.JPG', '00000386.JPG', '00000387.JPG', '00000388.JPG',
     'IMG_4417.JPG', 'IMG_4453.JPG', 'IMG_4455.JPG', 'IMG_4463.JPG'
-  ].filter(img => img.endsWith('.JPG')); // Only show JPG files
+  ].filter(img => img.endsWith('.JPG'));
 
   React.useEffect(() => {
-    // Start with fallback images immediately
-    setImagePaths(fallbackImages);
-    
-    // Try to load from CSV, but don't clear fallback if it fails
     loadImagePaths('/image_paths.csv')
       .then(paths => {
-        console.log('Loaded paths from CSV:', paths.length);
         if (paths.length > 0) {
-          // Extract just filenames from full paths
           const filenames = paths
-            .map(path => path.split('/').pop() || '')
+            .map(p => p.split('/').pop() || '')
             .filter(name => name.endsWith('.JPG'));
-          console.log('Extracted filenames:', filenames.length);
           if (filenames.length > 0) {
             setImagePaths(filenames);
+            return;
           }
         }
+        setImagePaths(fallbackImages);
       })
       .catch((error) => {
-        console.log('Failed to load CSV, using fallback images:', error);
-        // Keep fallback images (already set above)
+        console.error('Failed to load CSV, using fallback images:', error);
+        setImagePaths(fallbackImages);
       })
       .finally(() => {
         setIsLoading(false);
