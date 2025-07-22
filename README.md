@@ -19,7 +19,9 @@ After it is running you only need to start the Next.js frontend.
 
    The script loads the images listed in `my-app/public/image_paths.csv`,
    computes embeddings using the model from `best.pt` and stores them
-   for later use.
+   for later use. A GPU is *not* required to search once the vector store is
+   created; the code automatically selects CUDA, Apple's MPS, or falls back to
+   the CPU depending on what is available on your machine.
 
 2. **Start both backend and frontend**
 
