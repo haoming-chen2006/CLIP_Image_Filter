@@ -51,6 +51,8 @@ const ImagesPage = () => {
   ].filter(img => img.endsWith('.JPG'));
 
   React.useEffect(() => {
+    // initialize backend vector store
+    fetch('/api/init').catch(err => console.error('Init failed', err));
     loadImagePaths('/image_paths.csv')
       .then(paths => {
         if (paths.length > 0) {

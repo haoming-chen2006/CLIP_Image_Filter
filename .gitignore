@@ -84,3 +84,6 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Backend vector store
+backend/vector_store.json
