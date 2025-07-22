@@ -1,9 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { promisify } from 'util'
-import { execFile } from 'child_process'
-import path from 'path'
-
-const execFileAsync = promisify(execFile)
 
 export async function GET(req: NextRequest) {
   const query = req.nextUrl.searchParams.get('q')
@@ -11,10 +6,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing query' }, { status: 400 })
   }
   try {
-    const scriptPath = path.join(process.cwd(), '..', 'inference.py')
-    const { stdout } = await execFileAsync('python3', [scriptPath, '--query', query, '--top', '1'])
-    const data = JSON.parse(stdout.trim())
-    return NextResponse.json({ image: data.matches[0] })
+    const res = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(query)}`)
+    const data = await res.json()
+    return NextResponse.json(data)
   } catch (err) {
     console.error('Search error', err)
     return NextResponse.json({ error: 'Inference failed' }, { status: 500 })

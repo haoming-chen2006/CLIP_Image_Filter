@@ -184,9 +184,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="CLIP inference")
     parser.add_argument("--query", type=str, help="run a single search query")
     parser.add_argument("--top", type=int, default=1, help="number of results to return")
+    parser.add_argument("--encode", type=str, help="encode text and return embedding")
     args = parser.parse_args()
 
-    if args.query:
+    if args.encode:
+        tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
+        encoded = tokenizer([args.encode], padding=True, truncation=True, max_length=CFG.max_length, return_tensors="pt")
+        model = CLIPModel().to(CFG.device)
+        model.load_state_dict(torch.load("best.pt", map_location=CFG.device))
+        model.eval()
+        batch = {k: v.to(CFG.device) for k, v in encoded.items()}
+        with torch.no_grad():
+            text_features = model.text_encoder(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+            text_embeddings = model.text_projection(text_features)
+            text_embeddings = F.normalize(text_embeddings, p=2, dim=-1)
+        print(json.dumps({"embedding": text_embeddings.squeeze(0).cpu().tolist()}))
+    elif args.query:
         image_names, comments = load_flickr_data()
         CFG.image_path = "my-app/public/images"
         model_path = "best.pt"
