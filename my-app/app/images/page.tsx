@@ -29,13 +29,16 @@ const ImagesPage = () => {
   const [searchQuery, setSearchQuery] = React.useState<string>('');
   
   // Function to simulate search (you can replace this with actual CLIP inference later)
-  const handleSearch = (query: string) => {
+  const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    
-    // Simulate search by randomly selecting an image from available images
-    if (imagePaths.length > 0) {
-      const randomIndex = Math.floor(Math.random() * imagePaths.length);
-      setSearchedImage(imagePaths[randomIndex]);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.image) {
+        setSearchedImage(data.image);
+      }
+    } catch (err) {
+      console.error('Search request failed', err);
     }
   };
   
