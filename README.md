@@ -5,6 +5,10 @@ frontend for text–to–image search using a CLIP model.
 
 ## Setup
 
+For a quick start you can run `python stupbackend.py`. This script will generate
+the vector store if it does not exist and then launch the inference backend.
+After it is running you only need to start the Next.js frontend.
+
 1. **Generate the vector store**
 
    Pre-compute image embeddings and save them to `backend/vector_store.json`:
