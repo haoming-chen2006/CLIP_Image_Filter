@@ -43,16 +43,9 @@ The model was trained on the Flickr30K dataset, containing:
 - **Quality**: Professional and amateur photography with rich descriptive text
 
 **Sample Image-Caption Pairs:**
-```
-Image: 00000005.JPG
-Caption: "A person in a yellow jacket climbing a steep rock face"
 
-Image: 00000027.JPG  
-Caption: "Two dogs running through a grassy field with trees in the background"
-
-Image: 00000104.JPG
-Caption: "A group of people sitting around a table in a restaurant"
-```
+![Flickr30K Dataset Samples](flickr_samples.png)
+*Sample images from the Flickr30K dataset showing diverse scenes with their corresponding captions: climbing scenes, outdoor activities, social gatherings, and more.*
 
 ### Instagram Dataset (Custom Collection)
 Additionally trained on curated Instagram images featuring:
@@ -101,7 +94,8 @@ The web application provides an intuitive experience where users can:
 3. Explore diverse visual content through semantic search
 4. Experience the power of multimodal AI in a practical application
 
-*Screenshot: The web interface shows a clean, modern design with a prominent search bar and image results displayed in an organized grid layout, demonstrating real-time text-to-image search capabilities.*
+![Web Application Interface](Screenshot%202025-07-22%20at%2014.52.07.png)
+*The web interface demonstrates a clean, modern design with a prominent search bar and image results displayed in an organized grid layout, showing real-time text-to-image search capabilities.*
 
 ## 🚀 Quick Start
 
