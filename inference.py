@@ -148,7 +148,10 @@ def main():
     print(f"Loaded {len(image_names)} images")
     
     # Check if model exists
-    model_path = "best.pt"
+    # Resolve model path relative to this script so it works regardless of
+    # the current working directory.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(script_dir, "best.pt")
     if not os.path.exists(model_path):
         print(f"Model not found at {model_path}")
         print("Please train the model first using train.py")
@@ -191,7 +194,9 @@ if __name__ == "__main__":
         tokenizer = DistilBertTokenizer.from_pretrained(CFG.text_tokenizer)
         encoded = tokenizer([args.encode], padding=True, truncation=True, max_length=CFG.max_length, return_tensors="pt")
         model = CLIPModel().to(CFG.device)
-        model.load_state_dict(torch.load("best.pt", map_location=CFG.device))
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        best_model = os.path.join(script_dir, "best.pt")
+        model.load_state_dict(torch.load(best_model, map_location=CFG.device))
         model.eval()
         batch = {k: v.to(CFG.device) for k, v in encoded.items()}
         with torch.no_grad():
@@ -202,7 +207,8 @@ if __name__ == "__main__":
     elif args.query:
         image_names, comments = load_flickr_data()
         CFG.image_path = "my-app/public/images"
-        model_path = "best.pt"
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(script_dir, "best.pt")
         model, image_embeddings, subset_filenames = get_image_embeddings(image_names, comments, model_path)
         matches = rank_images(model, image_embeddings, args.query, subset_filenames, n=args.top)
         print(json.dumps({"matches": matches}))

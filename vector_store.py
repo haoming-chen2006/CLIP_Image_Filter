@@ -1,4 +1,5 @@
 import json
+import os
 import torch
 import torch.nn.functional as F
 from inference import load_flickr_data, get_image_embeddings
@@ -7,7 +8,8 @@ from config import CFG
 if __name__ == '__main__':
     image_names, comments = load_flickr_data()
     CFG.image_path = 'my-app/public/images'
-    model_path = 'best.pt'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(script_dir, 'best.pt')
     model, image_embeddings, subset_filenames = get_image_embeddings(image_names, comments, model_path)
     image_embeddings = F.normalize(image_embeddings, p=2, dim=-1).cpu().tolist()
     data = {
