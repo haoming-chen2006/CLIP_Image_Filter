@@ -13,8 +13,6 @@ from config import CFG
 
 
 
-print(CFG)
-
 class CLIPDataset(torch.utils.data.Dataset):
     def __init__(self, image_filenames, captions, tokenizer, transforms):
         """
