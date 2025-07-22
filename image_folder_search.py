@@ -79,9 +79,11 @@ def load_images_from_folder(folder_path):
 def find_latest_checkpoint():
     """Find the latest checkpoint or best model"""
     # First check for best.pt
-    if os.path.exists("best.pt"):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    best_model = os.path.join(script_dir, "best.pt")
+    if os.path.exists(best_model):
         print("Using best.pt model")
-        return "best.pt"
+        return best_model
     
     # Look for latest checkpoint
     checkpoint_dir = "checkpoints"
