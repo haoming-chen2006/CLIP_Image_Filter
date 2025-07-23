@@ -54,13 +54,46 @@ Additionally trained on curated Instagram images featuring:
 - **Style**: Modern social media aesthetic with varied compositions
 - **Enhancement**: Expands model's understanding of contemporary visual culture
 
+### Scenery & City Datasets (Kaggle)
+For the CLIP-guided enhancement feature, additional training was performed on specialized datasets:
+
+#### Natural Scenery Dataset
+- **Source**: Kaggle Natural Landscapes Collection
+- **Images**: ~25,000 high-quality landscape photographs
+- **Categories**: Mountains, forests, beaches, deserts, rivers, and countryside
+- **Lighting Conditions**: Dawn, dusk, golden hour, overcast, and clear weather
+- **Quality Focus**: Professional nature photography with excellent lighting and composition
+- **Enhancement Training**: Paired low/high quality images for learning denoising and lighting improvements
+
+#### Urban Cityscapes Dataset  
+- **Source**: Kaggle City Scenes & Architecture Dataset
+- **Images**: ~15,000 urban photography samples
+- **Categories**: Skylines, street scenes, architectural details, public spaces
+- **Time Variations**: Day/night cycles, different weather conditions, seasonal changes
+- **Style Range**: Modern cities, historical architecture, industrial areas
+- **Technical Focus**: Trained on enhancing urban lighting, reducing noise from night photography, and improving atmospheric conditions
+
 ## ✨ Capabilities
 
-### Core Features
+### Primary Feature: Semantic Image Search
 - **Natural Language Queries**: Search using descriptive text in plain English
 - **Semantic Understanding**: Finds conceptually similar images beyond exact keyword matches
 - **Real-time Inference**: Fast CPU-based search after initial embedding computation
 - **Scalable Architecture**: Handles large image collections efficiently through vector similarity
+
+### Secondary Feature: CLIP-Guided Image Enhancement & Generation
+- **Diffusion-Based Image Editing**: Uses guided diffusion to enhance existing scenery images through denoising and lighting improvements
+- **Intelligent Denoising**: CLIP guidance ensures semantic preservation while removing noise and artifacts
+- **Dynamic Lighting Enhancement**: Adjusts exposure, contrast, and color temperature based on scene understanding
+- **Atmospheric Refinement**: Improves weather conditions, sky quality, and environmental lighting in landscape photos
+- **Scenery-Specific Optimization**: Specialized processing for natural landscapes, cityscapes, and architectural photography
+- **Text-Guided Enhancement**: Natural language descriptions guide specific improvements ("make sunset more dramatic", "brighten the landscape", "enhance the colors")
+- **Quality Restoration**: Repairs low-quality images while maintaining photorealistic appearance
+- **Creative Applications**: 
+  - Transform day scenes to golden hour lighting
+  - Enhance weather conditions (clearer skies, more vibrant sunsets)
+  - Improve composition through selective enhancement of scene elements
+  - Generate high-quality variations of existing landscape photography
 
 ### Advanced Search Examples
 The system excels at understanding:
@@ -164,16 +197,46 @@ python3 scripts/check_ports.py
 - **Cross-Modal Understanding**: Joint embedding space enables text↔image retrieval
 - **Production Ready**: Clean API separation between Python ML backend and Node.js web services
 
+### CLIP-Guided Enhancement Pipeline
+The system architecture extends beyond search to enable intelligent image enhancement and generation:
+
+#### Enhancement Components
+- **CLIP Semantic Analysis**: Pre-trained CLIP model analyzes input images to understand scene content and quality
+- **Diffusion-Based Editing**: Custom U-Net architecture trained specifically for scenery and cityscape enhancement
+- **Quality Assessment**: CLIP embeddings guide the enhancement process by comparing current vs. target image quality
+- **Scene-Specific Processing**: Different enhancement strategies for natural landscapes vs. urban environments
+
+#### Enhancement Process
+1. **Scene Analysis**: Input image analyzed through CLIP vision encoder to identify content type and quality issues
+2. **Enhancement Strategy**: System selects appropriate denoising and lighting enhancement techniques
+3. **Guided Diffusion**: Iterative enhancement guided by CLIP similarity to high-quality reference embeddings
+4. **Quality Validation**: Enhanced images evaluated against learned quality metrics from training datasets
+5. **Semantic Consistency**: Ensures enhanced images maintain original scene content and composition
+
+#### Enhancement Capabilities
+- **Noise Reduction**: Advanced denoising that preserves fine details and textures
+- **Lighting Optimization**: Automatic exposure correction, shadow/highlight recovery, and color temperature adjustment
+- **Weather Enhancement**: Clear skies from overcast conditions, enhanced sunset/sunrise colors
+- **Atmospheric Processing**: Improved visibility, reduced haze, enhanced contrast in landscape photography
+- **Urban Night Enhancement**: Better illumination of cityscapes, reduced noise in low-light photography
+
 ### File Structure
 ```
 CLIP_Image_Filter/
 ├── model_architecture/     # Custom encoder implementations
+│   ├── resnetencoder.py    # ResNet-50 image encoder
+│   ├── vitencoder.py       # Vision Transformer alternative
+│   └── textencoder.py      # DistilBERT text encoder
 ├── backend/                # Node.js inference server  
 ├── my-app/                # Next.js web application
 ├── scripts/               # Deployment utilities
+├── generation/            # CLIP-guided diffusion (in development)
+│   ├── diffusion_model.py # Stable diffusion integration
+│   ├── clip_guidance.py   # CLIP-based guidance mechanisms
+│   └── scene_generator.py # High-level generation interface
 ├── best.pt               # Trained model weights
 ├── vector_store.py       # Embedding pre-computation
 └── inference.py          # Core search functionality
 ```
 
-This implementation demonstrates the practical application of multimodal AI for content discovery, providing a foundation for building sophisticated image search systems.
+This implementation demonstrates the practical application of multimodal AI for both content discovery and creative generation, providing a foundation for building sophisticated image search and synthesis systems.
