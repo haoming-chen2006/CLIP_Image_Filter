@@ -1,6 +1,18 @@
 # CLIP Image Search Demo
 
-I am very unorganized when it comes to image searching, so I find it useful to have a semantic image to test search tool that can help me to find the right image in my album. I am trying to build a tool that is very simple to use and connect to album I used custom-trained CLIP (Contrastive Language-Image Pre-training) model to enable natural language queries for image retrieval. This demo features a Node.js backend for inference and a Next.js frontend for an intuitive web interface.
+I am very unorganized when it comes to image searching and lazy when it comes to editing, so I find it useful to have a semantic image to test search tool that can help me to find the right image in my album and an editor to make the image look better. I used custom-trained CLIP (Contrastive Language-Image Pre-training) model to enable natural language queries for image retrieval and used a CLIP-guided diffusion model for image editing. This demo features a Node.js backend for inference and a Next.js frontend for an intuitive web interface.
+
+## ✨ Capabilities
+
+### Primary Feature: Semantic Image Search
+- **Natural Language Queries**: Search using descriptive text in plain English
+- **Semantic Understanding**: Finds conceptually similar images, wtihout the need of captions
+- **Real-time Inference**: Fast CPU-based search after initial embedding computation
+
+### Secondary Feature: CLIP-Guided Image Enhancement & Generation
+- **Diffusion-Based Image Editing**: Uses guided diffusion to enhance existing scenery images through denoising and lighting improvements
+- **Intelligent Denoising**: CLIP guidance ensures semantic preservation while removing noise and artifacts
+- **Dynamic Lighting Enhancement**: Adjusts exposure, contrast, and color temperature based on scene understanding
 
 ## 🏗️ Model Architecture
 
@@ -77,55 +89,15 @@ For the CLIP-guided enhancement feature, additional training was performed on sp
 
 ### Primary Feature: Semantic Image Search
 - **Natural Language Queries**: Search using descriptive text in plain English
-- **Semantic Understanding**: Finds conceptually similar images beyond exact keyword matches
+- **Semantic Understanding**: Finds conceptually similar images, wtihout the need of captions
 - **Real-time Inference**: Fast CPU-based search after initial embedding computation
-- **Scalable Architecture**: Handles large image collections efficiently through vector similarity
 
 ### Secondary Feature: CLIP-Guided Image Enhancement & Generation
 - **Diffusion-Based Image Editing**: Uses guided diffusion to enhance existing scenery images through denoising and lighting improvements
 - **Intelligent Denoising**: CLIP guidance ensures semantic preservation while removing noise and artifacts
 - **Dynamic Lighting Enhancement**: Adjusts exposure, contrast, and color temperature based on scene understanding
-- **Atmospheric Refinement**: Improves weather conditions, sky quality, and environmental lighting in landscape photos
-- **Scenery-Specific Optimization**: Specialized processing for natural landscapes, cityscapes, and architectural photography
-- **Text-Guided Enhancement**: Natural language descriptions guide specific improvements ("make sunset more dramatic", "brighten the landscape", "enhance the colors")
-- **Quality Restoration**: Repairs low-quality images while maintaining photorealistic appearance
-- **Creative Applications**: 
-  - Transform day scenes to golden hour lighting
-  - Enhance weather conditions (clearer skies, more vibrant sunsets)
-  - Improve composition through selective enhancement of scene elements
-  - Generate high-quality variations of existing landscape photography
 
-### Advanced Search Examples
-The system excels at understanding:
-- **Objects & Entities**: "red car", "golden retriever", "mountain landscape"
-- **Actions & Activities**: "people dancing", "children playing", "cooking food" 
-- **Scenes & Contexts**: "beach sunset", "city street at night", "cozy interior"
-- **Emotions & Moods**: "happy celebration", "peaceful nature", "dramatic lighting"
-- **Artistic Qualities**: "black and white photo", "vibrant colors", "minimalist composition"
 
-### Performance Metrics
-- **Embedding Dimension**: 256D normalized vectors for efficient similarity computation
-- **Search Speed**: Sub-second response times using cosine similarity
-- **Memory Efficiency**: Pre-computed embeddings eliminate need for model inference during search
-- **Accuracy**: High semantic relevance through contrastive learning on large-scale datasets
-
-## 🖥️ Web Application
-
-The demo includes a modern web interface built with Next.js and Tailwind CSS:
-
-### Features Demonstrated
-- **Interactive Search Bar**: Real-time text input with instant results
-- **Image Gallery**: Grid-based display of search results
-- **Responsive Design**: Optimized for desktop and mobile viewing
-- **Fast Loading**: Efficient image serving from local storage
-- **Error Handling**: Graceful fallbacks for connectivity issues
-
-### User Interface
-The web application provides an intuitive experience where users can:
-1. Enter natural language descriptions in the search field
-2. Instantly see the most relevant images from the dataset
-3. Explore diverse visual content through semantic search
-4. Experience the power of multimodal AI in a practical application
 
 ![Web Application Interface](Screenshot%202025-07-22%20at%2014.52.07.png)
 *The web interface demonstrates a clean, modern design with a prominent search bar and image results displayed in an organized grid layout, showing real-time text-to-image search capabilities.*
@@ -137,106 +109,6 @@ For immediate setup, run the automated backend script:
 python stupbackend.py
 ```
 This will generate embeddings if needed and launch the inference server.
-
-## 📋 Manual Setup
-
-### 1. Generate Vector Store
-Pre-compute image embeddings for fast search:
-```bash
-python3 vector_store.py
-```
-
-### 2. Install Dependencies
-Ensure all Python packages are installed:
-```bash
-pip install torch torchvision transformers timm albumentations opencv-python einops pandas matplotlib pillow tqdm
-```
-
-Install Node.js dependencies:
-```bash
-cd my-app && npm install
-```
-
-### 3. Launch Application
-Start both backend and frontend:
-```bash
-./scripts/start.sh
-```
-- Backend runs on `http://localhost:8000` 
-- Frontend available at `http://localhost:3000/images`
-
-## 🏥 HPC Deployment (NERSC Perlmutter)
-
-For high-performance computing environments:
-
-```bash
-# SSH tunnel for port forwarding
-ssh -L 3000:localhost:3000 -L 8000:localhost:8000 <user>@perlmutter.nersc.gov
-
-# Generate embeddings and start services
-python3 vector_store.py
-BACKEND_URL=http://localhost:8000 ./scripts/start.sh
-```
-
-Verify connectivity:
-```bash
-python3 scripts/check_ports.py
-```
-
-## 🔧 Technical Details
-
-### System Requirements
-- **Python**: 3.8+ with PyTorch ecosystem
-- **Node.js**: 16+ for backend and frontend services
-- **Memory**: Minimum 4GB RAM for embedding computation
-- **Storage**: ~500MB for model weights and image dataset
-
-### Architecture Benefits
-- **Modular Design**: Separate image/text encoders enable flexible training
-- **Efficient Inference**: Vector similarity search scales to millions of images
-- **Cross-Modal Understanding**: Joint embedding space enables text↔image retrieval
-- **Production Ready**: Clean API separation between Python ML backend and Node.js web services
-
-### CLIP-Guided Enhancement Pipeline
-The system architecture extends beyond search to enable intelligent image enhancement and generation:
-
-#### Enhancement Components
-- **CLIP Semantic Analysis**: Pre-trained CLIP model analyzes input images to understand scene content and quality
-- **Diffusion-Based Editing**: Custom U-Net architecture trained specifically for scenery and cityscape enhancement
-- **Quality Assessment**: CLIP embeddings guide the enhancement process by comparing current vs. target image quality
-- **Scene-Specific Processing**: Different enhancement strategies for natural landscapes vs. urban environments
-
-#### Enhancement Process
-1. **Scene Analysis**: Input image analyzed through CLIP vision encoder to identify content type and quality issues
-2. **Enhancement Strategy**: System selects appropriate denoising and lighting enhancement techniques
-3. **Guided Diffusion**: Iterative enhancement guided by CLIP similarity to high-quality reference embeddings
-4. **Quality Validation**: Enhanced images evaluated against learned quality metrics from training datasets
-5. **Semantic Consistency**: Ensures enhanced images maintain original scene content and composition
-
-#### Enhancement Capabilities
-- **Noise Reduction**: Advanced denoising that preserves fine details and textures
-- **Lighting Optimization**: Automatic exposure correction, shadow/highlight recovery, and color temperature adjustment
-- **Weather Enhancement**: Clear skies from overcast conditions, enhanced sunset/sunrise colors
-- **Atmospheric Processing**: Improved visibility, reduced haze, enhanced contrast in landscape photography
-- **Urban Night Enhancement**: Better illumination of cityscapes, reduced noise in low-light photography
-
-### File Structure
-```
-CLIP_Image_Filter/
-├── model_architecture/     # Custom encoder implementations
-│   ├── resnetencoder.py    # ResNet-50 image encoder
-│   ├── vitencoder.py       # Vision Transformer alternative
-│   └── textencoder.py      # DistilBERT text encoder
-├── backend/                # Node.js inference server  
-├── my-app/                # Next.js web application
-├── scripts/               # Deployment utilities
-├── generation/            # CLIP-guided diffusion (in development)
-│   ├── diffusion_model.py # Stable diffusion integration
-│   ├── clip_guidance.py   # CLIP-based guidance mechanisms
-│   └── scene_generator.py # High-level generation interface
-├── best.pt               # Trained model weights
-├── vector_store.py       # Embedding pre-computation
-└── inference.py          # Core search functionality
 ```
 
 This implementation demonstrates the practical application of multimodal AI for both content discovery and creative generation, providing a foundation for building sophisticated image search and synthesis systems.
