@@ -39,6 +39,10 @@ class CLIPDataset(torch.utils.data.Dataset):
         else:
             self.encoded_captions = self.captions        
         self.transforms = transforms
+        
+        # Track placeholders
+        self.placeholder_count = 0
+        self.total_accessed = 0
 
     def __getitem__(self, idx):
         item = {
@@ -49,11 +53,14 @@ class CLIPDataset(torch.utils.data.Dataset):
         # Build full image path
         image_path = os.path.join(CFG.image_path, self.image_filenames[idx])
         
+        # Track access
+        self.total_accessed += 1
+        
         # Load and process image
         image = cv2.imread(image_path)
         if image is None:
             # Create placeholder if image not found
-            print(f"Warning: Image {image_path} not found, using placeholder.")
+            self.placeholder_count += 1
             image = np.zeros((CFG.size, CFG.size, 3), dtype=np.uint8)
         else:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -66,6 +73,26 @@ class CLIPDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.captions)
+    
+    def get_stats(self):
+        """Return dataset loading statistics"""
+        images_loaded = self.total_accessed - self.placeholder_count
+        return {
+            'total_accessed': self.total_accessed,
+            'images_loaded': images_loaded,
+            'placeholders_used': self.placeholder_count,
+            'success_rate': (images_loaded / self.total_accessed * 100) if self.total_accessed > 0 else 0
+        }
+
+
+def print_dataset_stats(dataset):
+    """Print dataset loading statistics"""
+    stats = dataset.get_stats()
+    print(f"Dataset Loading Statistics:")
+    print(f"  Images loaded successfully: {stats['images_loaded']}")
+    print(f"  Placeholders used: {stats['placeholders_used']}")
+    print(f"  Total accessed: {stats['total_accessed']}")
+    print(f"  Success rate: {stats['success_rate']:.1f}%")
 
 
 def load_flickr_data():
@@ -73,7 +100,7 @@ def load_flickr_data():
     Load Flickr data from results.csv
     Returns: image_names (list), captions (list)
     """
-    csv_path = "/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images/results.csv"
+    csv_path = "/pscratch/sd/h/haoming/Projects/clip/flickr/results.csv"
     
     # Load CSV with pipe separator
     df = pd.read_csv(csv_path, sep='|')

@@ -13,23 +13,39 @@ from clip import CLIPModel
 
 
 def load_image_list(csv_path: str):
-    """Load image filenames from a CSV list"""
-    paths = []
+    """Load image filenames and comments from a pipe-separated CSV"""
+    image_names = []
+    comments = []
     try:
         with open(csv_path, 'r') as f:
-            for line in f:
+            for line_num, line in enumerate(f):
                 line = line.strip()
-                if line:
-                    paths.append(os.path.basename(line))
+                if not line:
+                    continue
+                
+                # Skip header line
+                if line_num == 0 and 'image_name' in line:
+                    continue
+                
+                # Split by pipe separator
+                parts = line.split('|')
+                if len(parts) >= 3:
+                    image_name = parts[0].strip()
+                    comment = parts[2].strip()
+                    
+                    if image_name and comment:
+                        image_names.append(image_name)
+                        comments.append(comment)
+                        
     except Exception as e:
         print(f"Error reading {csv_path}: {e}")
-    return paths
+    
+    return image_names, comments
 
 
 def load_flickr_data(csv_path: str = "my-app/public/image_paths.csv"):
-    """Load image names from a simple CSV file"""
-    image_names = load_image_list(csv_path)
-    comments = ["" for _ in image_names]
+    """Load image names and comments from a pipe-separated CSV file"""
+    image_names, comments = load_image_list(csv_path)
     return image_names, comments
 
 
@@ -39,8 +55,8 @@ def get_image_embeddings(image_names, comments, model_path):
     
     # Create dataset and loader
     dataset = CLIPDataset(
-        image_names[:10000],  # Use subset for faster inference
-        comments[:10000],
+        image_names,
+        comments,
         tokenizer,
         get_transforms("valid"),
     )
@@ -64,7 +80,125 @@ def get_image_embeddings(image_names, comments, model_path):
             image_embeddings = model.image_projection(image_features)
             valid_image_embeddings.append(image_embeddings)
     
-    return model, torch.cat(valid_image_embeddings), image_names[:10000]
+    return model, torch.cat(valid_image_embeddings), image_names
+
+def get_embed(image_path, model_path=None):
+    """
+    Load a single image and compute its embedding (simplified version)
+    
+    Args:
+        image_path (str): Path to the image file
+        model_path (str): Path to the trained model file (optional, defaults to best.pt)
+    
+    Returns:
+        torch.Tensor: Normalized image embedding
+    """
+    # Default model path
+    if model_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(script_dir, "best.pt")
+    
+    # Check if model exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model not found at {model_path}")
+    
+    # Check if image exists
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Image not found at {image_path}")
+    
+    # Load model
+    model = CLIPModel().to(CFG.device)
+    model.load_state_dict(torch.load(model_path, map_location=CFG.device))
+    model.eval()
+    
+    # Load and process image (using same logic as dataset.py)
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"Could not load image from {image_path}")
+    
+    # Convert BGR to RGB (same as dataset.py)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Apply transforms (same as dataset.py)
+    transforms = get_transforms("valid")
+    image = transforms(image=image)['image']
+    
+    # Convert to tensor and add batch dimension (same as dataset.py)
+    image_tensor = torch.tensor(image).permute(2, 0, 1).float()
+    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension [1, C, H, W]
+    
+    # Move to device
+    image_tensor = image_tensor.to(CFG.device)
+    
+    # Compute embedding
+    with torch.no_grad():
+        image_features = model.image_encoder(image_tensor)
+        image_embedding = model.image_projection(image_features)
+        
+        # Normalize embedding (same as in other functions)
+        image_embedding = F.normalize(image_embedding, p=2, dim=-1)
+    
+    return image_embedding.squeeze(0)  # Remove batch dimension
+
+
+def load_single_image_embedding(image_path, model_path=None):
+    """
+    Load a single image and compute its embedding
+    
+    Args:
+        image_path (str): Path to the image file
+        model_path (str): Path to the trained model file (optional, defaults to best.pt)
+    
+    Returns:
+        torch.Tensor: Normalized image embedding
+    """
+    # Default model path
+    if model_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(script_dir, "best.pt")
+    
+    # Check if model exists
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model not found at {model_path}")
+    
+    # Check if image exists
+    if not os.path.exists(image_path):
+        raise FileNotFoundError(f"Image not found at {image_path}")
+    
+    # Load model
+    model = CLIPModel().to(CFG.device)
+    model.load_state_dict(torch.load(model_path, map_location=CFG.device))
+    model.eval()
+    
+    # Load and process image (using same logic as dataset.py)
+    image = cv2.imread(image_path)
+    if image is None:
+        raise ValueError(f"Could not load image from {image_path}")
+    
+    # Convert BGR to RGB (same as dataset.py)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Apply transforms (same as dataset.py)
+    transforms = get_transforms("valid")
+    image = transforms(image=image)['image']
+    
+    # Convert to tensor and add batch dimension (same as dataset.py)
+    image_tensor = torch.tensor(image).permute(2, 0, 1).float()
+    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension [1, C, H, W]
+    
+    # Move to device
+    image_tensor = image_tensor.to(CFG.device)
+    
+    # Compute embedding
+    with torch.no_grad():
+        image_features = model.image_encoder(image_tensor)
+        image_embedding = model.image_projection(image_features)
+        
+        # Normalize embedding (same as in other functions)
+        image_embedding = F.normalize(image_embedding, p=2, dim=-1)
+    
+    return image_embedding.squeeze(0)  # Remove batch dimension
+
 
 
 def rank_images(model, image_embeddings, query, image_filenames, n=9):
