@@ -97,6 +97,39 @@ def load_flickr_data():
     return clean_image_names, clean_captions
 
 
+def load_instagram_data(
+    csv_path="/pscratch/sd/h/haoming/Projects/clip/artworks/instagram_data/captions.csv",
+    image_col="image_name",
+    caption_col="caption",
+):
+    """Load Instagram artwork data from a CSV file.
+
+    The CSV file is expected to be comma separated and contain at least two
+    columns: one with the image filename and another with the corresponding
+    caption.  Rows without a valid caption are dropped.  The function returns
+    the list of image filenames and their captions.
+    """
+
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"CSV file not found: {csv_path}")
+
+    df = pd.read_csv(csv_path)
+
+    if image_col not in df.columns or caption_col not in df.columns:
+        raise ValueError(
+            f"CSV must contain columns '{image_col}' and '{caption_col}'"
+        )
+
+    df = df.dropna(subset=[image_col, caption_col])
+    df = df[df[caption_col].astype(str).str.strip() != ""]
+
+    image_names = df[image_col].astype(str).tolist()
+    captions = df[caption_col].astype(str).tolist()
+
+    print(f"Loaded {len(image_names)} valid image-caption pairs from Instagram data")
+    return image_names, captions
+
+
 def get_transforms(mode="train"):
     """Get image transforms"""
     return A.Compose([
