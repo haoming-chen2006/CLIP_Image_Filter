@@ -84,7 +84,7 @@ def get_image_embeddings(image_names, comments, model_path):
 
 def get_embed(image_path, model_path=None):
     """
-    Load a single image and compute its embedding (simplified version)
+    Load a single image and compute its embedding (simplified version using PIL)
     
     Args:
         image_path (str): Path to the image file
@@ -93,6 +93,9 @@ def get_embed(image_path, model_path=None):
     Returns:
         torch.Tensor: Normalized image embedding
     """
+    from PIL import Image
+    import numpy as np
+    
     # Default model path
     if model_path is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -111,13 +114,12 @@ def get_embed(image_path, model_path=None):
     model.load_state_dict(torch.load(model_path, map_location=CFG.device))
     model.eval()
     
-    # Load and process image (using same logic as dataset.py)
-    image = cv2.imread(image_path)
-    if image is None:
-        raise ValueError(f"Could not load image from {image_path}")
-    
-    # Convert BGR to RGB (same as dataset.py)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # Load and process image using PIL instead of OpenCV
+    try:
+        image = Image.open(image_path).convert('RGB')
+        image = np.array(image)  # Convert PIL to numpy array
+    except Exception as e:
+        raise ValueError(f"Could not load image from {image_path}: {e}")
     
     # Apply transforms (same as dataset.py)
     transforms = get_transforms("valid")
