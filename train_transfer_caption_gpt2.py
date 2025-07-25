@@ -11,17 +11,22 @@ from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer
+
+from modules import TransferHead, GPT
 
 from config import CFG
 from dataset import CLIPDataset, get_transforms, load_flickr_data
 from clip import CLIPModel
-from modules import TransferHead
 from utils import AvgMeter, get_lr
 
+if torch.cuda.is_available():
+    torch.backends.cuda.enable_flash_sdp(True)
+    torch.backends.cuda.enable_mem_efficient_sdp(True)
 
-class CLIPTransferCaptionModel(nn.Module):
-    """Generate captions using frozen CLIP image encoder and GPT2-medium."""
+
+class CLIPTransferCaptionModelGPT2(nn.Module):
+    """Generate captions using frozen CLIP image encoder and GPT2-medium from modules."""
 
     def __init__(self, gpt_name: str = "gpt2-medium"):
         super().__init__()
@@ -30,8 +35,8 @@ class CLIPTransferCaptionModel(nn.Module):
         for p in self.clip.parameters():
             p.requires_grad = False
 
-        # Load GPT2-medium
-        self.lm = AutoModelForCausalLM.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
+        # Load GPT2-medium from modules with pretrained weights
+        self.lm = GPT.from_pretrained(gpt_name)
 
         # Projection from CLIP embedding (256) to GPT2 hidden dim
         self.transfer_head = TransferHead(CFG.projection_dim, self.lm.config.n_embd)
@@ -48,38 +53,22 @@ class CLIPTransferCaptionModel(nn.Module):
 
         token_embeds = self.lm.transformer.wte(input_ids)
         inputs_embeds = torch.cat([prefix, token_embeds[:, :-1, :]], dim=1)
-        attn_mask = torch.cat([
-            torch.ones(prefix.size(0), 1, device=attention_mask.device),
-            attention_mask[:, :-1],
-        ], dim=1)
 
-        outputs = self.lm(inputs_embeds=inputs_embeds, attention_mask=attn_mask, labels=input_ids)
-        return outputs.loss
+        b, t, _ = inputs_embeds.size()
+        pos = torch.arange(0, t, dtype=torch.long, device=inputs_embeds.device)
+        pos_emb = self.lm.transformer.wpe(pos)
+        x = self.lm.transformer.drop(inputs_embeds + pos_emb)
+        for block in self.lm.transformer.h:
+            x = block(x)
+        x = self.lm.transformer.ln_f(x)
+        logits = self.lm.lm_head(x)
 
-    @torch.no_grad()
-    def generate_captions(self, image_paths: List[str], tokenizer, max_length: int = 50):
-        """Generate captions for a list of image paths."""
-        self.eval()
-        images = []
-        for p in image_paths:
-            img = cv2.imread(os.path.join(CFG.image_path, p))
-            if img is None:
-                continue
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = get_transforms("valid")(image=img)["image"]
-            images.append(torch.tensor(img).permute(2, 0, 1).float())
+        loss = torch.nn.functional.cross_entropy(
+            logits.view(-1, logits.size(-1)),
+            input_ids.view(-1),
+        )
+        return loss
 
-        if not images:
-            return []
-        batch = torch.stack(images).to(next(self.parameters()).device)
-        img_feat = self.clip.image_encoder(batch)
-        clip_embed = self.clip.image_projection(img_feat)
-        prefix = self.transfer_head(clip_embed)
-        attention_mask = torch.ones(prefix.size(0), 1, device=prefix.device)
-        generated = self.lm.generate(inputs_embeds=prefix.unsqueeze(1), attention_mask=attention_mask, max_length=max_length)
-        captions = tokenizer.batch_decode(generated, skip_special_tokens=True)
-        self.train()
-        return captions
 
 
 def split_data(image_names, captions, train_ratio=0.8, val_ratio=0.1):
@@ -175,7 +164,7 @@ def main():
 
     train_loader, val_loader = build_loaders(train_images, train_captions, val_images, val_captions, tokenizer, ddp=ddp)
 
-    model = CLIPTransferCaptionModel().to(device)
+    model = CLIPTransferCaptionModelGPT2().to(device)
     if ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
 
@@ -198,12 +187,7 @@ def main():
                 print("Saved best model")
             print(f"Train Loss: {train_loss.avg:.4f} | Val Loss: {valid_loss.avg:.4f}")
 
-    raw_model = model.module if ddp else model
-    sample_images = val_images[:5]
-    captions_out = raw_model.generate_captions(sample_images, tokenizer)
-    if master_process:
-        for img, cap in zip(sample_images, captions_out):
-            print(f"{img} -> {cap}")
+    # Generation is not implemented for the GPT2 training script
 
     if ddp:
         destroy_process_group()
