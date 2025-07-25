@@ -4,7 +4,8 @@ from tqdm import tqdm
 
 import torch
 from torch import nn
-from transformers import GPT2Tokenizer, AutoModelForCausalLM
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from config import CFG
 from dataset import CLIPDataset, get_transforms, load_flickr_data
@@ -24,7 +25,7 @@ class CLIPTransferCaptionModel(nn.Module):
             p.requires_grad = False
 
         # Load GPT2-medium
-        self.lm = AutoModelForCausalLM.from_pretrained(gpt_name)
+        self.lm = AutoModelForCausalLM.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
         # Projection from CLIP embedding (256) to GPT2 hidden dim
         self.transfer_head = TransferHead(CFG.projection_dim, self.lm.config.n_embd)
@@ -107,7 +108,7 @@ def main():
     image_names, captions = load_flickr_data()
     train_images, train_captions, val_images, val_captions = split_data(image_names, captions)
 
-    tokenizer = GPT2Tokenizer.from_pretrained("gpt2-medium")
+    tokenizer = AutoTokenizer.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
     tokenizer.pad_token = tokenizer.eos_token
 
     train_loader, val_loader = build_loaders(train_images, train_captions, val_images, val_captions, tokenizer)
