@@ -82,6 +82,18 @@ class ProjectionHead(nn.Module):
         return x
 
 
+class TransferHead(nn.Module):
+    """Simple projection head for transferring CLIP embeddings"""
+
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        self.linear = nn.Linear(in_dim, out_dim)
+        self.act = nn.GELU()
+
+    def forward(self, x):
+        return self.act(self.linear(x))
+
+
 
 
 class LayerNorm(nn.Module):
