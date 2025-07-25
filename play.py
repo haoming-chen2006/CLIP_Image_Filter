@@ -1,12 +1,4 @@
-from inference import get_embed
-import torch
-import os
-from transformers import DistilBertTokenizer
-from config import CFG
-from clip import CLIPModel
-import torch.nn.functional as F
-
-from inference import load_single_image_embedding  # Use the more robust function
+from inference import get_embed, load_single_image_embedding
 import torch
 import os
 from transformers import DistilBertTokenizer
@@ -31,33 +23,27 @@ if not os.path.exists(image1) or not os.path.exists(image2):
 
 print("Loading embeddings for both images...")
 
-try:
-    # Get embeddings for both images using the more robust function
-    embed1 = load_single_image_embedding(image1)
-    embed2 = load_single_image_embedding(image2)
-    
-    print(f"✓ Successfully loaded embeddings")
-    print(f"Image 1 embedding shape: {embed1.shape}")
-    print(f"Image 2 embedding shape: {embed2.shape}")
-    
-except Exception as e:
-    print(f"Error loading image embeddings: {e}")
-    print("Let's try with a Flickr image instead...")
-    
-    # Try using a Flickr image as fallback
-    flickr_image = "/pscratch/sd/h/haoming/Projects/clip/flickr/flickr30k_images/flickr30k_images/1000092795.jpg"
-    if os.path.exists(flickr_image):
-        print(f"Using Flickr image: {flickr_image}")
-        embed1 = load_single_image_embedding(flickr_image)
-        embed2 = load_single_image_embedding(image2)  # Try image2 again
-        print(f"Image 1 (Flickr) embedding shape: {embed1.shape}")
-        print(f"Image 2 embedding shape: {embed2.shape}")
-    else:
-        print(f"Flickr image not found either: {flickr_image}")
-        exit(1)
+flickr_image = "/pscratch/sd/h/haoming/Projects/clip/flickr/flickr30k_images/flickr30k_images/1000092795.jpg"
+
+def load_or_fallback(path, fallback=None):
+    try:
+        return load_single_image_embedding(path)
+    except Exception as e:
+        print(f"Failed to load {path}: {e}")
+        if fallback is not None:
+            print(f"Using fallback image: {fallback}")
+            return load_single_image_embedding(fallback)
+        raise
+
+embed1 = load_or_fallback(image1, flickr_image)
+embed2 = load_or_fallback(image2, flickr_image)
 
 print(f"Image 1 embedding shape: {embed1.shape}")
 print(f"Image 2 embedding shape: {embed2.shape}")
+
+# Compute embedding difference
+diff = embed1 - embed2
+print(f"Embedding difference norm: {torch.norm(diff).item():.4f}")
 
 # Image similarity
 similarity = torch.cosine_similarity(embed1, embed2, dim=0)
