@@ -47,14 +47,16 @@ class CLIPTransferCaptionModel(nn.Module):
         prefix = self.transfer_head(clip_embed).unsqueeze(1)
 
         token_embeds = self.lm.transformer.wte(input_ids)
-        inputs_embeds = torch.cat([prefix, token_embeds[:, :-1, :]], dim=1)
+        inputs_embeds = torch.cat([prefix, token_embeds], dim=1)
         attn_mask = torch.cat([
             torch.ones(prefix.size(0), 1, device=attention_mask.device),
-            attention_mask[:, :-1],
+            attention_mask,
         ], dim=1)
 
-        outputs = self.lm(inputs_embeds=inputs_embeds, attention_mask=attn_mask, labels=input_ids)
-        return outputs.loss
+        outputs = self.lm(inputs_embeds=inputs_embeds, attention_mask=attn_mask)
+        logits = outputs.logits[:, 1:, :]
+        loss = torch.nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), input_ids.view(-1))
+        return loss
 
     @torch.no_grad()
     def generate_captions(self, image_paths: List[str], tokenizer, max_length: int = 50):

@@ -52,7 +52,7 @@ class CLIPTransferCaptionModelGPT2(nn.Module):
         prefix = self.transfer_head(clip_embed).unsqueeze(1)
 
         token_embeds = self.lm.transformer.wte(input_ids)
-        inputs_embeds = torch.cat([prefix, token_embeds[:, :-1, :]], dim=1)
+        inputs_embeds = torch.cat([prefix, token_embeds], dim=1)
 
         b, t, _ = inputs_embeds.size()
         pos = torch.arange(0, t, dtype=torch.long, device=inputs_embeds.device)
@@ -62,7 +62,7 @@ class CLIPTransferCaptionModelGPT2(nn.Module):
             x = block(x)
         x = self.lm.transformer.ln_f(x)
         logits = self.lm.lm_head(x)
-
+        logits = logits[:, 1:, :]
         loss = torch.nn.functional.cross_entropy(
             logits.view(-1, logits.size(-1)),
             input_ids.view(-1),
