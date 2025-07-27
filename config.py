@@ -4,8 +4,8 @@ import torch
 
 class CFG:
     debug = False
-    dataset_root = "/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images"
-    image_path = '/pscratch/sd/h/haoming/Projects/clip/flickr-dataset/flickr30k_images/flickr30k_images'
+    dataset_root = "/pscratch/sd/h/haoming/Projects/clip/flickr/flickr30k_images"
+    image_path = '/pscratch/sd/h/haoming/Projects/clip/flickr/flickr30k_images/flickr30k_images'
     captions_path = dataset_root
     batch_size = 32
     num_workers = 4
@@ -15,7 +15,7 @@ class CFG:
     weight_decay = 1e-3
     patience = 1
     factor = 0.8
-    epochs = 6
+    epochs = 20  # Increased number of epochs for better convergence
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available() and torch.backends.mps.is_built():

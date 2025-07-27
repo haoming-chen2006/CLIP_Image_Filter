@@ -19,7 +19,25 @@ class CLIPDataset(torch.utils.data.Dataset):
         Simple CLIP dataset
         image_filenames and captions must have the same length
         """
-        self.image_filenames = image_filenames
+        # Validate and filter image paths
+        valid_indices = []
+        missing_images = []
+        for idx, img_name in enumerate(image_filenames):
+            img_path = os.path.join(CFG.image_path, img_name)
+            if os.path.exists(img_path):
+                valid_indices.append(idx)
+            else:
+                missing_images.append(img_name)
+        
+        if missing_images:
+            print(f"\nWARN: Found {len(missing_images)} missing images out of {len(image_filenames)}")
+            print(f"First few missing images: {missing_images[:5]}")
+            print(f"Using {len(valid_indices)} valid images for training/validation")
+        
+        # Keep only valid images and their captions
+        self.image_filenames = [image_filenames[i] for i in valid_indices]
+        captions = [captions[i] for i in valid_indices]
+        
         self.captions = list(captions)
         
         # Clean captions - ensure all are strings and not None/NaN
@@ -39,36 +57,32 @@ class CLIPDataset(torch.utils.data.Dataset):
         else:
             self.encoded_captions = self.captions        
         self.transforms = transforms
-        
-        # Track placeholders
-        self.placeholder_count = 0
-        self.total_accessed = 0
 
     def __getitem__(self, idx):
         item = {
             key: torch.tensor(values[idx])
             for key, values in self.encoded_captions.items()
         }
-
-        # Build full image path
+        
         image_path = os.path.join(CFG.image_path, self.image_filenames[idx])
-        
-        # Track access
-        self.total_accessed += 1
-        
-        # Load and process image
         image = cv2.imread(image_path)
         if image is None:
-            # Create placeholder if image not found
-            self.placeholder_count += 1
-            image = np.zeros((CFG.size, CFG.size, 3), dtype=np.uint8)
-        else:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            raise ValueError(f"Failed to load image at {image_path}")
+            
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        transformed = self.transforms(image=image)
+        image = transformed['image']
         
-        image = self.transforms(image=image)['image']
-        item['image'] = torch.tensor(image).permute(2, 0, 1).float()
+        # Debug checks
+        if idx == 0:  # Only print for first item to avoid spam
+            print(f"\nImage debug info:")
+            print(f"Raw image shape: {image.shape}")
+            print(f"Image dtype: {image.dtype}")
+            print(f"Image value range: [{image.min():.3f}, {image.max():.3f}]")
+        
+        item['image'] = image
         item['caption'] = self.captions[idx]
-
+        
         return item
 
     def __len__(self):
@@ -160,8 +174,13 @@ def load_instagram_data(
 def get_transforms(mode="train"):
     """Get image transforms"""
     return A.Compose([
-        A.Resize(256, 256),
-        A.Normalize(max_pixel_value=255.0),
+        A.Resize(224, 224),  # ResNet expects 224x224 images
+        A.Normalize(
+            mean=[0.485, 0.456, 0.406],  # ImageNet means
+            std=[0.229, 0.224, 0.225],    # ImageNet stds
+            max_pixel_value=255.0
+        ),
+        A.pytorch.ToTensorV2(),  # Convert to tensor and transpose channels
     ])
 
 def visualize_first_five():
