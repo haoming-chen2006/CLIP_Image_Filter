@@ -18,7 +18,7 @@ device = torch.device("cpu")
 print(f"Using device: {device}")
 
 # Import config but override device
-from config import CFG
+from config import ClipConfig as CFG
 CFG.device = device
 CFG.batch_size = 4  # Smaller batch size for CPU
 

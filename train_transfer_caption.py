@@ -13,7 +13,7 @@ from torch.distributed import init_process_group, destroy_process_group
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from config import CFG
+from config import TransferGPTConfig as CFG
 from dataset import CLIPDataset, get_transforms, load_flickr_data
 from clip import CLIPModel
 from modules import TransferHead

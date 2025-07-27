@@ -2,7 +2,7 @@ from inference import get_embed, load_single_image_embedding
 import torch
 import os
 from transformers import DistilBertTokenizer
-from config import CFG
+from config import ClipConfig as CFG
 from clip import CLIPModel
 import torch.nn.functional as F
 

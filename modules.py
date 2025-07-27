@@ -15,7 +15,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 import timm
 from transformers import DistilBertModel, DistilBertConfig
-from config import CFG
+from config import ClipConfig as CFG
 
 
 class ImageEncoder(nn.Module):

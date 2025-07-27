@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 import albumentations as A
 
-from config import CFG
+from config import ClipConfig as CFG
 from clip import CLIPModel
 
 

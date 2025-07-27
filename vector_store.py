@@ -3,7 +3,7 @@ import os
 import torch
 import torch.nn.functional as F
 from inference import load_flickr_data, get_image_embeddings
-from config import CFG
+from config import ClipConfig as CFG
 
 if __name__ == '__main__':
     image_names, comments = load_flickr_data()

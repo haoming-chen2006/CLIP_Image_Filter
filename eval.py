@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from train_transfer_caption_gpt2 import CLIPTransferCaptionModelGPT2
 from dataset import get_transforms
-from config import CFG
+from config import TransferGPT2Config as CFG
 
 
 def load_latest_checkpoint(device: torch.device) -> dict:

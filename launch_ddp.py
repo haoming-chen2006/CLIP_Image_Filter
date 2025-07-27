@@ -7,7 +7,7 @@ from transformers import DistilBertTokenizer
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-from config import CFG
+from config import ClipConfig as CFG
 from dataset import CLIPDataset, get_transforms
 from clip import CLIPModel
 from inference import load_flickr_data, get_image_embeddings

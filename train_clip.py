@@ -5,7 +5,7 @@ from tqdm import tqdm
 import torch
 from transformers import DistilBertTokenizer
 
-from config import CFG
+from config import ClipConfig as CFG
 from dataset import CLIPDataset, get_transforms, load_flickr_data
 from clip import CLIPModel
 from utils import AvgMeter, get_lr
@@ -20,7 +20,7 @@ def save_checkpoint(model, optimizer, epoch, best_loss, folder="checkpoints"):
         "epoch": epoch,
         "best_loss": best_loss,
     }
-    torch.save(checkpoint, os.path.join(folder, f"checkpoint_{epoch}.pt"))
+    torch.save(checkpoint, os.path.join(folder, f"checkpoint_CLIP_{epoch}.pt"))
 
 
 def load_latest_checkpoint(model, optimizer, folder="checkpoints"):
@@ -109,7 +109,7 @@ def valid_epoch(model, valid_loader):
     return loss_meter
 
 
-def main():
+def main(num_epochs=20):  # Explicitly specify epochs here instead of config
     print("CLIP Training")
     print("=" * 50)
     
@@ -127,6 +127,22 @@ def main():
 
     # Model and optimizer
     model = CLIPModel().to(CFG.device)
+    
+    # Try to load best.pt if it exists
+    best_model_path = "best.pt"
+    if os.path.exists(best_model_path):
+        print(f"Loading best model from {best_model_path}")
+        model.load_state_dict(torch.load(best_model_path, map_location=CFG.device))
+        # Evaluate current best model to get best loss
+        model.eval()
+        with torch.no_grad():
+            valid_loss = valid_epoch(model, val_loader)
+        best_loss = valid_loss.avg
+        print(f"Loaded best model with validation loss: {best_loss:.4f}")
+    else:
+        best_loss = float('inf')
+        print("No best model found, starting from scratch")
+
     optimizer = torch.optim.AdamW([
         {"params": model.image_encoder.parameters(), "lr": CFG.image_encoder_lr},
         {"params": model.text_encoder.parameters(), "lr": CFG.text_encoder_lr},
@@ -138,11 +154,11 @@ def main():
         optimizer, mode="min", patience=CFG.patience, factor=CFG.factor
     )
 
-    start_epoch, best_loss = load_latest_checkpoint(model, optimizer)
+    start_epoch, _ = load_latest_checkpoint(model, optimizer)  # Ignore checkpoint's best_loss, use best.pt's instead
 
     # Training loop
-    for epoch in range(start_epoch, CFG.epochs):
-        print(f"\nEpoch: {epoch + 1}/{CFG.epochs}")
+    for epoch in range(start_epoch, num_epochs):
+        print(f"\nEpoch: {epoch + 1}/{num_epochs}")
         
         model.train()
         train_loss = train_epoch(model, train_loader, optimizer, lr_scheduler, "epoch")
@@ -154,11 +170,19 @@ def main():
         if valid_loss.avg < best_loss:
             best_loss = valid_loss.avg
             torch.save(model.state_dict(), "best.pt")
-            print("✓ Saved Best Model!")
-
-        save_checkpoint(model, optimizer, epoch + 1, best_loss)
+            print(f"✓ Saved Best Model! (val_loss: {best_loss:.4f})")
+            
+            # Also update the checkpoint with the new best loss
+            save_checkpoint(model, optimizer, epoch + 1, best_loss)
+        else:
+            # Regular checkpoint save without updating best.pt
+            save_checkpoint(model, optimizer, epoch + 1, best_loss)
+            print(f"× Current val_loss ({valid_loss.avg:.4f}) > best ({best_loss:.4f})")
         
         print(f"Train Loss: {train_loss.avg:.4f} | Val Loss: {valid_loss.avg:.4f}")
+        
+        # Update learning rate scheduler
+        lr_scheduler.step(valid_loss.avg)
 
     print("\n✓ Training completed!")
 
@@ -177,6 +201,11 @@ def main():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description='Train CLIP model')
+    parser.add_argument('--epochs', type=int, default=20, help='number of epochs to train')
+    args = parser.parse_args()
+    
     random.seed(42)
     torch.manual_seed(42)
-    main()
+    main(num_epochs=args.epochs)

@@ -16,7 +16,7 @@ from transformers import AutoTokenizer
 
 from modules import TransferHead, GPT
 from transformers import DistilBertTokenizer
-from config import CFG
+from config import TransferGPT2Config as CFG
 from dataset import CLIPDataset, get_transforms, load_flickr_data
 from clip import CLIPModel
 from utils import AvgMeter, get_lr

@@ -8,7 +8,7 @@ from transformers import DistilBertTokenizer
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from config import CFG
+from config import ClipConfig as CFG  # Using CLIP config since this is primarily for CLIP training
 
 
 
