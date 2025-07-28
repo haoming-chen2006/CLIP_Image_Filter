@@ -213,7 +213,15 @@ def main():
     if ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=CFG.weight_decay)
+    # Setup optimizer based on config
+    if CFG.optimizer.lower() == "adamw":
+        optimizer = torch.optim.AdamW(model.parameters(), lr=CFG.learning_rate, weight_decay=CFG.weight_decay)
+    elif CFG.optimizer.lower() == "adam":
+        optimizer = torch.optim.Adam(model.parameters(), lr=CFG.learning_rate, weight_decay=CFG.weight_decay)
+    elif CFG.optimizer.lower() == "sgd":
+        optimizer = torch.optim.SGD(model.parameters(), lr=CFG.learning_rate, weight_decay=CFG.weight_decay, momentum=0.9)
+    else:
+        raise ValueError(f"Unsupported optimizer: {CFG.optimizer}")
     
     # Try to load checkpoint
     start_epoch = 0

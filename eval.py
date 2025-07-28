@@ -1,7 +1,8 @@
 import os
 import glob
 import random
-from typing import List, Optional
+from typing import List, Optional, Tuple
+import numpy as np
 
 import torch
 import torch.nn.functional as F
@@ -11,8 +12,17 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 from train_transfer_caption_gpt2 import CLIPTransferCaptionModelGPT2
-from dataset import get_transforms
+from dataset import get_transforms, load_flickr_data
 from config import TransferGPT2Config as CFG
+from clip import CLIPModel
+from inference import rank_images, get_image_embeddings
+
+# Colors for visualization
+COLORS = {
+    'target': '#2ecc71',  # Green
+    'clip': '#3498db',    # Blue
+    'gpt2': '#e74c3c'     # Red
+}
 
 
 def load_latest_checkpoint(device: torch.device) -> dict:
@@ -112,13 +122,28 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
     """Evaluate the model on a list of images and optionally save visualizations"""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Load model and tokenizer
-    print("Loading model and tokenizer...")
-    model = CLIPTransferCaptionModelGPT2(gpt_name="gpt2").to(device)
+    # Load GPT2 model and tokenizer
+    print("Loading GPT2 caption model and tokenizer...")
+    gpt2_model = CLIPTransferCaptionModelGPT2(gpt_name="gpt2").to(device)
     checkpoint = load_latest_checkpoint(device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
+    gpt2_model.load_state_dict(checkpoint['model_state_dict'])
+    gpt2_model.eval()
     
+    # Load CLIP model for semantic search
+    print("Loading CLIP model...")
+    clip_model = CLIPModel().to(device)
+    clip_model.load_state_dict(torch.load("best.pt", map_location=device))
+    clip_model.eval()
+    
+    # Load Flickr dataset for getting target captions and CLIP search
+    print("Loading Flickr dataset...")
+    flickr_images, flickr_captions = load_flickr_data()
+    
+    # Compute CLIP embeddings for the full dataset
+    print("Computing CLIP embeddings for the dataset...")
+    _, image_embeddings, subset_filenames = get_image_embeddings(flickr_images, flickr_captions, "best.pt")
+    
+    # Setup tokenizer
     tokenizer = AutoTokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.bos_token = tokenizer.eos_token  # Use EOS as BOS token since GPT2 doesn't have explicit BOS
@@ -135,15 +160,35 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
     for idx, image_path in enumerate(image_paths):
         try:
             print(f"\nProcessing image {idx + 1}/{len(image_paths)}: {os.path.basename(image_path)}")
+            image_name = os.path.basename(image_path)
             
-            # Load and process image
+            # 1. Get target caption from Flickr dataset
+            try:
+                image_idx = flickr_images.index(image_name)
+                target_caption = flickr_captions[image_idx]
+            except ValueError:
+                target_caption = "Target caption not found"
+            
+            # 2. Get CLIP-based similar caption
+            clip_matches = rank_images(clip_model, image_embeddings, "", subset_filenames, n=1)
+            if clip_matches:
+                try:
+                    clip_img_idx = flickr_images.index(clip_matches[0])
+                    clip_caption = flickr_captions[clip_img_idx]
+                except ValueError:
+                    clip_caption = "CLIP caption not found"
+            else:
+                clip_caption = "No CLIP matches found"
+            
+            # 3. Generate GPT2 caption
             image_tensor = load_image(image_path)
+            gpt2_caption = generate_caption(gpt2_model, tokenizer, image_tensor, device=device)
             
-            # Generate caption
-            caption = generate_caption(model, tokenizer, image_tensor, device=device)
-            results.append((image_path, caption))
+            results.append((image_path, target_caption, clip_caption, gpt2_caption))
             
-            print(f"✓ Generated caption: \"{caption}\"")
+            print(f"✓ Target caption:  \"{target_caption}\"")
+            print(f"✓ CLIP caption:    \"{clip_caption}\"")
+            print(f"✓ GPT2 caption:    \"{gpt2_caption}\"")
             print("-" * 50)
             
             if save_visualization:
@@ -154,45 +199,6 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
                 img = Image.open(image_path)
                 plt.imshow(img)
                 
-                # Add caption as title
-                plt.title(f"Image: {os.path.basename(image_path)}\nCaption: \"{caption}\"", 
-                         fontsize=12, pad=10)
-                plt.axis('off')
-        
-        except Exception as e:
-            print(f"✗ Error processing {image_path}: {str(e)}")
-            print("-" * 50)
-    
-    # Print summary
-    print("\nGeneration Summary:")
-    print("=" * 80)
-    for idx, (image_path, caption) in enumerate(results, 1):
-        print(f"{idx}. {os.path.basename(image_path)}")
-        print(f"   Caption: \"{caption}\"")
-        print("-" * 80)
-    
-    if save_visualization and results:
-        plt.tight_layout()
-        plt.savefig('sample_captions.png', bbox_inches='tight', dpi=300)
-        print("\nVisualization saved as 'sample_captions.png'")
-
-
-def main():
-    # Sample some random images from the validation set
-    flickr_dir = CFG.image_path
-    all_images = [os.path.join(flickr_dir, f) for f in os.listdir(flickr_dir) if f.endswith(('.jpg', '.jpeg', '.png'))]
-    
-    if len(all_images) == 0:
-        raise ValueError(f"No images found in {flickr_dir}")
-    
-    # Randomly sample 5 images
-    sample_images = random.sample(all_images, min(5, len(all_images)))
-    
-    # Generate captions for the sampled images
-    evaluate_on_images(sample_images)
-
-
-if __name__ == "__main__":
-    random.seed(42)
-    torch.manual_seed(42)
-    main()
+                # Add all three captions as title
+                plt.title(f"Image: {os.path.basename(image_path)}\n" + 
+                         f"Target: \"{target_caption}\"\n" +

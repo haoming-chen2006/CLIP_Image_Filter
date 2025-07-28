@@ -24,18 +24,43 @@ def save_checkpoint(model, optimizer, epoch, best_loss, folder="checkpoints"):
 
 
 def load_latest_checkpoint(model, optimizer, folder="checkpoints"):
-    if not os.path.isdir(folder):
-        return 0, float("inf")
-    checkpoints = [f for f in os.listdir(folder) if f.startswith("checkpoint_") and f.endswith(".pt")]
-    if not checkpoints:
-        return 0, float("inf")
-    checkpoints.sort(key=lambda x: int(x.split("_")[1].split(".")[0]))
-    ckpt_path = os.path.join(folder, checkpoints[-1])
-    ckpt = torch.load(ckpt_path, map_location=CFG.device)
-    model.load_state_dict(ckpt["model"])
-    optimizer.load_state_dict(ckpt["optimizer"])
-    print(f"✓ Loaded checkpoint '{ckpt_path}'")
-    return ckpt.get("epoch", 0), ckpt.get("best_loss", float("inf"))
+    # First try to load best.pt from root directory
+    best_model_path = "best.pt"
+    if os.path.exists(best_model_path):
+        print(f"Loading best model from {best_model_path}")
+        model.load_state_dict(torch.load(best_model_path, map_location=CFG.device))
+        
+        # If checkpoints folder doesn't exist or is empty, start from epoch 0
+        if not os.path.isdir(folder):
+            return 0, float("inf")
+            
+        checkpoints = [f for f in os.listdir(folder) if f.startswith("checkpoint_CLIP_") and f.endswith(".pt")]
+        if not checkpoints:
+            return 0, float("inf")
+            
+        # Load the latest checkpoint just to get the epoch number and optimizer state
+        checkpoints.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
+        ckpt_path = os.path.join(folder, checkpoints[-1])
+        ckpt = torch.load(ckpt_path, map_location=CFG.device)
+        optimizer.load_state_dict(ckpt["optimizer"])
+        print(f"✓ Loaded optimizer state from '{ckpt_path}'")
+        return ckpt.get("epoch", 0), ckpt.get("best_loss", float("inf"))
+    
+    # If best.pt doesn't exist, try loading from checkpoints folder
+    if os.path.isdir(folder):
+        checkpoints = [f for f in os.listdir(folder) if f.startswith("checkpoint_CLIP_") and f.endswith(".pt")]
+        if checkpoints:
+            checkpoints.sort(key=lambda x: int(x.split("_")[-1].split(".")[0]))
+            ckpt_path = os.path.join(folder, checkpoints[-1])
+            ckpt = torch.load(ckpt_path, map_location=CFG.device)
+            model.load_state_dict(ckpt["model"])
+            optimizer.load_state_dict(ckpt["optimizer"])
+            print(f"✓ Loaded checkpoint '{ckpt_path}'")
+            return ckpt.get("epoch", 0), ckpt.get("best_loss", float("inf"))
+    
+    # If no checkpoints found anywhere, start from scratch
+    print("No checkpoints found, starting from scratch")
+    return 0, float("inf")
 
 
 def split_data(image_names, captions, train_ratio=0.8, val_ratio=0.1):

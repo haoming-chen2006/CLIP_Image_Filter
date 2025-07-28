@@ -23,7 +23,7 @@ from utils import AvgMeter, get_lr
 class CLIPTransferCaptionModel(nn.Module):
     """Generate captions using frozen CLIP image encoder and GPT2-medium."""
 
-    def __init__(self, gpt_name: str = "gpt2-medium"):
+    def __init__(self, gpt_name: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         super().__init__()
         # Load CLIP and freeze it
         self.clip = CLIPModel()
@@ -33,8 +33,8 @@ class CLIPTransferCaptionModel(nn.Module):
         # Load GPT2-medium
         self.lm = AutoModelForCausalLM.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
-        # Projection from CLIP embedding (256) to GPT2 hidden dim
-        self.transfer_head = TransferHead(CFG.projection_dim, self.lm.config.n_embd)
+        # Projection from CLIP embedding (256) to LLaMA hidden dim
+        self.transfer_head = TransferHead(CFG.projection_dim, self.lm.config.hidden_size)
 
     def forward(self, batch):
         images = batch["image"]
@@ -46,7 +46,7 @@ class CLIPTransferCaptionModel(nn.Module):
             clip_embed = self.clip.image_projection(img_feat)
         prefix = self.transfer_head(clip_embed).unsqueeze(1)
 
-        token_embeds = self.lm.transformer.wte(input_ids)
+        token_embeds = self.lm.model.embed_tokens(input_ids)
         inputs_embeds = torch.cat([prefix, token_embeds], dim=1)
         attn_mask = torch.cat([
             torch.ones(prefix.size(0), 1, device=attention_mask.device),
@@ -54,7 +54,7 @@ class CLIPTransferCaptionModel(nn.Module):
         ], dim=1)
 
         outputs = self.lm(inputs_embeds=inputs_embeds, attention_mask=attn_mask)
-        logits = outputs.logits[:, 1:, :]
+        logits = outputs.logits[:, 1:, :].contiguous()  # Make tensor contiguous before view
         loss = torch.nn.functional.cross_entropy(logits.view(-1, logits.size(-1)), input_ids.view(-1))
         return loss
 

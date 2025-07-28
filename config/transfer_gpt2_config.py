@@ -12,6 +12,7 @@ class TransferGPT2Config:
     weight_decay = 1e-3
     patience = 1
     factor = 0.8
+    epochs = 30  # Adding epochs for training duration
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
@@ -38,3 +39,9 @@ class TransferGPT2Config:
     eval_batch_size = 32
     save_steps = 4  # Save checkpoint every N epochs
     projection_dim = 256  # Should match CLIP's projection_dim
+    
+    # Training hyperparameters
+    max_grad_norm = 1.0  # For gradient clipping
+    warmup_steps = 1000
+    scheduler = "linear"  # Options: "linear", "cosine", "plateau"
+    optimizer = "adamw"  # Options: "adam", "adamw", "sgd"
