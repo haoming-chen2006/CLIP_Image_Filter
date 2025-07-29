@@ -107,12 +107,18 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
 
     print("Loading TinyLlama caption model...")
     tiny_model = CLIPTransferCaptionModel().to(device)
+    checkpoint = load_tiny_checkpoint(device)
+    print("llama model loaded form" + checkpoint)
     tiny_model.load_state_dict(load_tiny_checkpoint(device))
     tiny_model.eval()
 
     print("Loading GPT2 caption model...")
     gpt2_model = CLIPTransferCaptionModelGPT2(gpt_name='gpt2').to(device)
-    gpt2_ckpt = load_gpt2_checkpoint(device)
+    gpt2_ckpt_tuple = load_gpt2_checkpoint(device)
+    if isinstance(gpt2_ckpt_tuple, tuple):
+        gpt2_ckpt, _ = gpt2_ckpt_tuple
+    else:
+        gpt2_ckpt = gpt2_ckpt_tuple
     gpt2_model.load_state_dict(gpt2_ckpt['model_state_dict'])
     gpt2_model.eval()
 
