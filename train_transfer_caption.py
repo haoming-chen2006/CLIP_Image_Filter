@@ -181,7 +181,7 @@ def main():
     if ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=CFG.weight_decay)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=CFG.weight_decay))
 
     best_loss = float("inf")
     for epoch in range(CFG.epochs):
@@ -200,12 +200,7 @@ def main():
                 print("Saved best model")
             print(f"Train Loss: {train_loss.avg:.4f} | Val Loss: {valid_loss.avg:.4f}")
 
-    raw_model = model.module if ddp else model
-    sample_images = val_images[:5]
-    captions_out = raw_model.generate_captions(sample_images, tokenizer)
-    if master_process:
-        for img, cap in zip(sample_images, captions_out):
-            print(f"{img} -> {cap}")
+    
 
     if ddp:
         destroy_process_group()
