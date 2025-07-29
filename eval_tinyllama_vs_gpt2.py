@@ -92,36 +92,25 @@ def generate_caption_tiny(
     temperature: float = 1.0,
     top_k: int = 50,
 ) -> str:
-    """Step-by-step caption generation for TinyLlama-based model."""
+    """Generate caption for TinyLlama-based model using HF generate."""
     model.eval()
     image = image.to(device)
     with torch.no_grad():
-        # Get CLIP embedding and project to LLaMA hidden dim
         img_feat = model.clip.image_encoder(image)
         clip_embed = model.clip.image_projection(img_feat)
-        image_embedding = model.transfer_head(clip_embed)
-        batch_size = image_embedding.size(0)
-        # Start with prefix only
-        inputs_embeds = image_embedding.view(batch_size, 1, -1)
-        attention_mask = torch.ones(batch_size, 1, device=device)
-        generated = []
-        for _ in range(max_length):
-            outputs = model.lm(inputs_embeds=inputs_embeds, attention_mask=attention_mask)
-            # Get logits for the last token
-            logits = outputs.logits[:, -1, :] / temperature
-            # Top-k sampling
-            top_k_logits, top_k_indices = torch.topk(logits, k=min(top_k, logits.size(-1)), dim=-1)
-            probs = F.softmax(top_k_logits, dim=-1)
-            next_token_index = torch.multinomial(probs, num_samples=1)
-            next_token = top_k_indices.gather(1, next_token_index)
-            if next_token.item() == tokenizer.eos_token_id:
-                break
-            generated.append(next_token.item())
-            # Get embedding for next token
-            next_token_embeds = model.lm.model.embed_tokens(next_token).view(batch_size, 1, -1)
-            inputs_embeds = torch.cat([inputs_embeds, next_token_embeds], dim=1)
-            attention_mask = torch.cat([attention_mask, torch.ones(batch_size, 1, device=device)], dim=1)
-    caption = tokenizer.decode(generated, skip_special_tokens=True)
+        prefix = model.transfer_head(clip_embed)
+        attention_mask = torch.ones(prefix.size(0), 1, device=device)
+        generated_ids = model.lm.generate(
+            inputs_embeds=prefix.unsqueeze(1),
+            attention_mask=attention_mask,
+            max_length=max_length,
+            do_sample=True,
+            top_k=top_k,
+            temperature=temperature,
+            eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.eos_token_id,
+        )
+        caption = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
     return caption.strip()
 
 def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
