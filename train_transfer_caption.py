@@ -181,7 +181,7 @@ def main():
     if ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=CFG.weight_decay))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=CFG.weight_decay)
 
     best_loss = float("inf")
     for epoch in range(CFG.epochs):

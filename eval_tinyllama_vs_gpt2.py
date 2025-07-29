@@ -29,6 +29,7 @@ def load_tiny_checkpoint(device: torch.device) -> dict:
     ckpt_path = os.path.join(os.path.dirname(__file__), 'transfer_caption_best.pt')
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(f"TinyLlama checkpoint not found at {ckpt_path}")
+    print(ckpt_path)
     return torch.load(ckpt_path, map_location=device)
 
 def load_image(image_path: str) -> torch.Tensor:
@@ -88,24 +89,39 @@ def generate_caption_tiny(
     image: torch.Tensor,
     device: torch.device,
     max_length: int = 50,
+    temperature: float = 1.0,
+    top_k: int = 50,
 ) -> str:
-    """Generate caption using the TinyLlama-based model"""
+    """Step-by-step caption generation for TinyLlama-based model."""
     model.eval()
     image = image.to(device)
     with torch.no_grad():
+        # Get CLIP embedding and project to LLaMA hidden dim
         img_feat = model.clip.image_encoder(image)
         clip_embed = model.clip.image_projection(img_feat)
-        prefix = model.transfer_head(clip_embed)
-        attention_mask = torch.ones(prefix.size(0), 1, device=device)
-        generated = model.lm.generate(
-            inputs_embeds=prefix.unsqueeze(1),
-            attention_mask=attention_mask,
-            max_length=max_length,
-            do_sample=True,
-            eos_token_id=tokenizer.eos_token_id,
-            pad_token_id=tokenizer.eos_token_id,
-        )
-    caption = tokenizer.decode(generated[0], skip_special_tokens=True)
+        image_embedding = model.transfer_head(clip_embed)
+        batch_size = image_embedding.size(0)
+        # Start with prefix only
+        inputs_embeds = image_embedding.view(batch_size, 1, -1)
+        attention_mask = torch.ones(batch_size, 1, device=device)
+        generated = []
+        for _ in range(max_length):
+            outputs = model.lm(inputs_embeds=inputs_embeds, attention_mask=attention_mask)
+            # Get logits for the last token
+            logits = outputs.logits[:, -1, :] / temperature
+            # Top-k sampling
+            top_k_logits, top_k_indices = torch.topk(logits, k=min(top_k, logits.size(-1)), dim=-1)
+            probs = F.softmax(top_k_logits, dim=-1)
+            next_token_index = torch.multinomial(probs, num_samples=1)
+            next_token = top_k_indices.gather(1, next_token_index)
+            if next_token.item() == tokenizer.eos_token_id:
+                break
+            generated.append(next_token.item())
+            # Get embedding for next token
+            next_token_embeds = model.lm.model.embed_tokens(next_token).view(batch_size, 1, -1)
+            inputs_embeds = torch.cat([inputs_embeds, next_token_embeds], dim=1)
+            attention_mask = torch.cat([attention_mask, torch.ones(batch_size, 1, device=device)], dim=1)
+    caption = tokenizer.decode(generated, skip_special_tokens=True)
     return caption.strip()
 
 def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
@@ -115,7 +131,7 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
     print("Loading TinyLlama caption model...")
     tiny_model = CLIPTransferCaptionModel().to(device)
     checkpoint = load_tiny_checkpoint(device)
-    print("TinyLlama checkpoint loaded")
+    print("TinyLlama checkpoint loaded as ")
     tiny_model.load_state_dict(checkpoint)
     tiny_model.eval()
 
@@ -129,16 +145,8 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
     gpt2_model.load_state_dict(gpt2_ckpt['model_state_dict'])
     gpt2_model.eval()
 
-    print("Loading CLIP model for ranking...")
-    clip_model = CLIPModel().to(device)
-    clip_model.load_state_dict(torch.load('best.pt', map_location=device))
-    clip_model.eval()
-
     print("Loading Flickr dataset...")
     flickr_images, flickr_captions = load_flickr_data()
-
-    print("Computing CLIP embeddings for the dataset...")
-    _, image_embeddings, subset_filenames = get_image_embeddings(flickr_images, flickr_captions, 'best.pt')
 
     llama_tokenizer = AutoTokenizer.from_pretrained('TinyLlama/TinyLlama-1.1B-Chat-v1.0')
     llama_tokenizer.pad_token = llama_tokenizer.eos_token
@@ -161,24 +169,13 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
             except ValueError:
                 target_caption = 'Target caption not found'
 
-            clip_matches = rank_images(clip_model, image_embeddings, '', subset_filenames, n=1)
-            if clip_matches:
-                try:
-                    clip_img_idx = flickr_images.index(clip_matches[0])
-                    clip_caption = flickr_captions[clip_img_idx]
-                except ValueError:
-                    clip_caption = 'CLIP caption not found'
-            else:
-                clip_caption = 'No CLIP matches found'
-
             image_tensor = load_image(image_path)
             gpt2_caption = generate_caption_gpt2(gpt2_model, gpt2_tokenizer, image_tensor, device)
             tiny_caption = generate_caption_tiny(tiny_model, llama_tokenizer, image_tensor, device)
 
-            results.append((image_path, target_caption, clip_caption, gpt2_caption, tiny_caption))
+            results.append((image_path, target_caption, gpt2_caption, tiny_caption))
 
             print(f"✓ Target caption:   \"{target_caption}\"")
-            print(f"✓ CLIP caption:     \"{clip_caption}\"")
             print(f"✓ GPT2 caption:     \"{gpt2_caption}\"")
             print(f"✓ TinyLlama caption:\"{tiny_caption}\"")
             print('-' * 50)
