@@ -97,7 +97,14 @@ def generate_caption_tiny(
         clip_embed = model.clip.image_projection(img_feat)
         prefix = model.transfer_head(clip_embed)
         attention_mask = torch.ones(prefix.size(0), 1, device=device)
-        generated = model.lm.generate(inputs_embeds=prefix.unsqueeze(1), attention_mask=attention_mask, max_length=max_length)
+        generated = model.lm.generate(
+            inputs_embeds=prefix.unsqueeze(1),
+            attention_mask=attention_mask,
+            max_length=max_length,
+            do_sample=True,
+            eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.eos_token_id,
+        )
     caption = tokenizer.decode(generated[0], skip_special_tokens=True)
     return caption.strip()
 
@@ -108,8 +115,8 @@ def evaluate_on_images(image_paths: List[str], save_visualization: bool = True):
     print("Loading TinyLlama caption model...")
     tiny_model = CLIPTransferCaptionModel().to(device)
     checkpoint = load_tiny_checkpoint(device)
-    print("llama model loaded form" + checkpoint)
-    tiny_model.load_state_dict(load_tiny_checkpoint(device))
+    print("TinyLlama checkpoint loaded")
+    tiny_model.load_state_dict(checkpoint)
     tiny_model.eval()
 
     print("Loading GPT2 caption model...")
