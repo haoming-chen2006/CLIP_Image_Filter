@@ -1,6 +1,6 @@
 # CLIP Image Search Demo
 
-I am very unorganized when it comes to image searching and lazy when it comes to editing, so I find it useful to have a semantic image to test search tool that can help me to find the right image in my album and an editor to make the image look better. I used custom-trained CLIP (Contrastive Language-Image Pre-training) model to enable natural language queries for image retrieval and used a CLIP-guided diffusion model for image editing. This demo features a Node.js backend for inference and a Next.js frontend for an intuitive web interface.
+I am very unorganized when it comes to image searching and lazy when it comes to editing, so I find it useful to have a semantic image search tool that can help me to find the right image in my album and an editor to make the image look better. It would be even better if there is an interactive chatbot that I can talk to about the images. I used custom-trained CLIP (Contrastive Language-Image Pre-training) model to enable natural language queries for image retrieval and used a CLIP-guided diffusion model for image editing. I also integrated the CLIP with a NanoGPT/TinyLLama backbone roughly following the structure of the BLIP paper. This demo features a Node.js backend for inference and a Next.js frontend for an intuitive web interface. Because I want to practise my understanding in ML all of these models are trained from scratch.
 
 ## ✨ Capabilities
 
